@@ -263,3 +263,15 @@ test("Copy installation atomically replaces candidate custody and recovers an un
   const altered={...delivery,schema:"zagel.hyperkey.private-delivery.v1"};
   await assert.rejects(hk.decryptPrivateSeedDelivery(altered,key.descriptor,{}, {recipientCopyId:candidate.copy.copyId,admissionId,selectedCommitId}),/schema/);
 });
+
+test("product and Copy index capacity fail before any staged record becomes visible",async()=>{
+  for(const indexName of ["product-index","copy-index"]){
+    const store=new InMemoryStateStore(),sealing=new InMemoryDeviceKeyStore(),host=composition(store,sealing,[]);
+    const key=await host.create({groupId:`index_bound_${indexName.replaceAll("-","_")}_0123456789`,founder:copy("capacity")});
+    const indexKey=[...store.records.keys()].find(key=>key.endsWith(`hyperkey/${indexName}/v1`));
+    await host.state.transaction([indexKey],records=>records.set(indexKey,{schema:"hyperkey.product-index.v1",entries:Array.from({length:256},(_,index)=>({descriptorId:key.id,copyId:`bounded_copy_${index}`}))}));
+    const before=structuredClone(store.records),revision=store.semanticRevision;
+    await assert.rejects(host.create({groupId:`new_index_bound_${indexName.replaceAll("-","_")}_0123456789`,founder:copy("extra")}),/index exceeds its bound/);
+    assert.deepEqual(store.records,before);assert.equal(store.semanticRevision,revision);
+  }
+});

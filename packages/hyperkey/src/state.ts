@@ -223,6 +223,7 @@ export class HyperKeyDeviceState {
       const index = records.get(keyFor("index", INDEX_KEY)) as ProductIndex | undefined ?? { schema: "hyperkey.product-index.v1", entries: [] };
       assertIndex(index);
       if (index.entries.some(value => value.descriptorId === input.descriptorId && value.copyId === input.readiness.copyId)) throw new Error("Founder HyperKey index already exists");
+      if (index.entries.length >= 256) throw new Error("HyperKey product index exceeds its bound");
       applyNativeTransition(records, input.stagedGroup, native);
       records.set(keyFor("product", productKey), product);
       records.set(keyFor("custody", custodyKey), { schema: "hyperkey.seed-custody.v1", seed: base64url(input.seed) });
@@ -442,7 +443,10 @@ function assertIndex(value: ProductIndex): void {
 function appendIndex(records: Map<string, unknown>, key: string, descriptorId: string, copyId: string): void {
   const index = records.get(keyFor("index", key)) as ProductIndex | undefined ?? { schema: "hyperkey.product-index.v1", entries: [] };
   assertIndex(index);
-  if (!index.entries.some(entry => entry.descriptorId === descriptorId && entry.copyId === copyId)) records.set(keyFor("index", key), { schema: "hyperkey.product-index.v1", entries: [...index.entries, { descriptorId, copyId }].sort(compareIndex) });
+  if (!index.entries.some(entry => entry.descriptorId === descriptorId && entry.copyId === copyId)) {
+    if (index.entries.length >= 256) throw new Error("HyperKey Copy index exceeds its bound");
+    records.set(keyFor("index", key), { schema: "hyperkey.product-index.v1", entries: [...index.entries, { descriptorId, copyId }].sort(compareIndex) });
+  }
 }
 function assertProduct(value: StoredHyperKeyProduct, descriptorId: string, copyId: string): void {
   if (!value || value.schema !== "hyperkey.product-state.v1") throw new Error("HyperKey product record is invalid");
