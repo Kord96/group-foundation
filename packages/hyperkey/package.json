@@ -29,8 +29,8 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "@group-foundation/group-core": "0.1.0",
-    "@group-foundation/group-admission": "0.1.0"
+    "@group-foundation/group-core": "workspace:*",
+    "@group-foundation/group-admission": "workspace:*"
   },
   "devDependencies": {
     "typescript": "5.9.3"
