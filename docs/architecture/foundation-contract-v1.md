@@ -49,3 +49,12 @@ imports a consumer package. HyperKey is not a Zagel runtime dependency.
 - The current MLS/OpenMLS/toolchain versions are preserved until a separately
   reviewed compatibility migration.
 - The current Zagel BFU remains in Zagel.
+
+## Release qualification
+
+`pnpm qualify:release` is the required Foundation release gate. It verifies the
+package DAG and production imports, runs the native and browser suites, rebuilds
+WASM into isolated output and compares every byte with tracked assets, exercises
+packed npm packages from an external consumer, and verifies the packaged Cargo
+crate. The command records hashes and tool versions without changing tracked
+artifacts. See [release qualification](../release-qualification.md).

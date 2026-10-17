@@ -1,9 +1,8 @@
-# Extraction integration and later consumer cutover
+# Extraction integration and consumer cutover
 
-This extraction leaves the source consumer intact. Foundation depends downward
-only on its two sibling packages, pinned at exact `0.1.0` versions. The runtime
-imports and concrete admission bridge use their frozen actual exports; no
-compatibility declarations or source links are part of the package.
+Foundation depends downward only on its two sibling packages, pinned at exact
+`0.1.0` versions. Its runtime imports use frozen public exports; no compatibility
+declarations or source links are part of the package.
 
 ## Integration assumptions
 
@@ -29,31 +28,21 @@ compatibility declarations or source links are part of the package.
   Copy transport/authority is a consumer responsibility; no consumer stubs are
   imported by the example.
 
-## Exact later Zagel cutover inventory
+## Zagel consumer cutover
 
-Do not remove these until a separate coherent consumer cutover uses the published
-Foundation package and concrete consumer storage/native/admission adapters:
+Zagel completed its clean Foundation cutover. `@zagel/hyperkey`, local HyperKey
+hosts, device-state bindings, browser fixtures, root exports, workspace entries,
+and source-relative asset paths have been removed. Zagel consumes only the
+immutable `0.1.0` release closure under
+`third_party/group-foundation/0.1.0`; its Room adapter composes Foundation
+admission inside the Room-owned custody/state/outbox transaction.
 
-| Source export or file | Later action |
-| --- | --- |
-| `packages/hyperkey/**` (`@zagel/hyperkey`, root and `./testing`) | Remove copied runtime, old tests and manifests after replacing direct consumers with the immutable published package. |
-| `packages/zagel/src/hyperkey/host.ts` | Remove local `HyperKeyHost`, `HyperKeyHostOptions`, `CreateLocalHyperKeyInput`, `LocalHyperKey`. |
-| `packages/zagel/src/hyperkey/state.ts` | Remove local `HyperKeyDeviceState`, `HyperKeyDeviceStateOptions`, `StoredHyperKeyProduct` and lease/device-store adapter implementation. Supply consumer-owned neutral persistence/sealing/commit classification instead. |
-| `packages/zagel/src/hyperkey/native-founder.ts` | Remove local `prepareNativeHyperKeyFounder`, `HyperKeyNativeModule`, `NativeHyperKeyFounderAuthority`; use Foundation's `hyperkey/native` export. |
-| `packages/zagel/src/index.ts` | Remove the corresponding runtime/type re-exports from the three local HyperKey modules. |
-| `packages/zagel/src/client/client.ts` | Remove local HyperKey import and `ZagelClientOptions.hyperKeys`, optional constructor argument, host construction, close handling and forwarding into `User`. |
-| `packages/zagel/src/user/user.ts` | Remove local host import, optional constructor argument/property `User.hyperKeys` and assignment. Compose a standalone Foundation facade at the consuming application boundary. |
-| `packages/zagel/tests/hyperkey-composition.test.mjs` | Move generic host/native/storage qualification to Foundation; retain only tests of intentional consumer adapters/composition. |
-| `examples/browser-host/src/hyperkeys.ts` | Replace consumer-`User` controller/mount helpers with standalone Foundation composition or remove that embedded example. |
-| `examples/browser-host/tests/support/hyperkey-preview.ts` and `.html` | Remove the consumer-native/host/device-store fixture and replace with the self-contained Foundation example as appropriate. |
-| `examples/browser-host/tests/hyperkey-qualification.spec.ts` | Move/repoint qualification to Foundation's browser artifact; retain consumer shell checks only where explicitly intended. |
-| `packages/zagel/package.json` | Remove `@zagel/hyperkey` workspace dependency; standalone application composition pins the published Foundation dependency. |
-| Root `package.json` | Remove old `packages/hyperkey` steps from `build:domains`, `test:domains`, `check:types`. |
-| `scripts/check-package-graph.mjs`, `scripts/check-module-boundaries.mjs`, `tests/integration/package-graph.test.mjs` | Remove local package/SDK dependency edges and update independent published Foundation boundaries. |
-| `docs/public-api-inventory.json` | Remove retired SDK HyperKey exports/composition entries. |
-| `pnpm-lock.yaml` and relevant browser/example manifests/configuration | Regenerate dependencies and remove stale workspace/alias links during cutover. |
+This does not make HyperKey a Zagel runtime feature. Foundation's standalone
+browser example is the supported qualification surface for the Copy workflow.
+Future applications compose HyperKey through its neutral ports and pin an
+immutable Foundation release. They must not restore an editable checkout,
+workspace alias, copied Zagel implementation, or predecessor-state reader.
 
-Reset preview HyperKey records and protocol state. The new descriptor/profile,
-delivery, transcript, persistence and native snapshot namespaces are incompatible;
-there are no old-schema readers. Room-owned envelopes remain Room-owned and are
-not renamed by this extraction.
+Preview records from the predecessor namespaces are rejected and reset. The
+current descriptor, delivery, transcript, persistence, and native snapshot
+namespaces have no conversion path. Room-owned envelopes remain owned by Room.
