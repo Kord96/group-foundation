@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HyperKey browser qualification</title>
+<style>body{font:16px system-ui;max-width:58rem;margin:3rem auto;padding:0 1rem}button{padding:.6rem;margin:.3rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}li{margin:1rem 0}</style>
+<h1>HyperKey browser qualification</h1>
+<p>This local example uses an explicit qualification authority. Each founder gets independent MLS and delivery keys. Sealed Copies survive a page reload in this browser.</p>
+<button id="create" disabled>Create HyperKey</button>
+<p id="status" role="status">Loading native MLS…</p>
+<ul id="keys"></ul>
+<output id="signature"></output>
+<script type="importmap">
+{"imports":{"@group-foundation/hyperkey":"/dependency/hyperkey/dist/index.js","@group-foundation/hyperkey/native":"/dependency/hyperkey/dist/native-founder.js","@group-foundation/group-core":"/dependency/group-core/dist/index.js","@group-foundation/group-core/encoding":"/dependency/group-core/dist/encoding.js","@group-foundation/group-core/native":"/dependency/group-core/generated/foundation_group.js","@group-foundation/group-admission":"/dependency/group-admission/dist/index.js"}}
+</script>
+<script type="module" src="/app.mjs"></script>
+</html>

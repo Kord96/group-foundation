@@ -1,0 +1,36 @@
+{
+  "schema": "hyperkey.conformance.v1",
+  "seed": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "descriptor": {
+    "schema": "hyperkey.descriptor.v1",
+    "groupId": "hyperkey_vector_group_000000000001",
+    "algorithm": "Ed25519",
+    "purpose": "conventional-signing",
+    "publicKey": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg"
+  },
+  "descriptorId": "epgzQf0Zxku-bbh4hgfz1IRQH5Swrd9nACMBpfpECB4",
+  "canonicalDescriptor": "WyJoeXBlcmtleS5kZXNjcmlwdG9yLnYxIiwiaHlwZXJrZXkuZGVzY3JpcHRvci52MSIsImh5cGVya2V5X3ZlY3Rvcl9ncm91cF8wMDAwMDAwMDAwMDEiLCJFZDI1NTE5IiwiY29udmVudGlvbmFsLXNpZ25pbmciLCJBNkVIdl9QT0VMNGRjTjBZNTB2QW1XZmsxakNicFExZkhkeUdaQkpWTWJnIl0",
+  "binding": {
+    "descriptorId": "epgzQf0Zxku-bbh4hgfz1IRQH5Swrd9nACMBpfpECB4",
+    "groupId": "hyperkey_vector_group_000000000001",
+    "profile": "hyperkey.v1",
+    "senderCopyId": "sender_copy_00000000000000000001",
+    "recipientCopyId": "recipient_copy_000000000000000001",
+    "recipientDeliveryKey": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+    "admissionId": "admission_0000000000000000000001",
+    "selectedCommitId": "selected_commit_0000000000000001",
+    "deliveryId": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+  },
+  "applicationTranscript": "WyJoeXBlcmtleS5hcHBsaWNhdGlvbi1kZWxpdmVyeS52MSIseyJhZG1pc3Npb25JZCI6ImFkbWlzc2lvbl8wMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiZGVsaXZlcnlJZCI6IkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWtKQ1FrSkNRa0pDUWsiLCJkZXNjcmlwdG9ySWQiOiJlcGd6UWYwWnhrdS1iYmg0aGdmejFJUlFINVN3cmQ5bkFDTUJwZnBFQ0I0IiwiZ3JvdXBJZCI6Imh5cGVya2V5X3ZlY3Rvcl9ncm91cF8wMDAwMDAwMDAwMDEiLCJwcm9maWxlIjoiaHlwZXJrZXkudjEiLCJyZWNpcGllbnRDb3B5SWQiOiJyZWNpcGllbnRfY29weV8wMDAwMDAwMDAwMDAwMDAwMDEiLCJyZWNpcGllbnREZWxpdmVyeUtleSI6IkJ3Y0hCd2NIQndjSEJ3Y0hCd2NIQndjSEJ3Y0hCd2NIQndjSEJ3Y0hCd2MiLCJzZWxlY3RlZENvbW1pdElkIjoic2VsZWN0ZWRfY29tbWl0XzAwMDAwMDAwMDAwMDAwMDEiLCJzZW5kZXJDb3B5SWQiOiJzZW5kZXJfY29weV8wMDAwMDAwMDAwMDAwMDAwMDAwMSJ9XQ",
+  "copy": {
+    "copyId": "recipient_copy_000000000000000001",
+    "member": {
+      "signingKeyFingerprint": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg"
+    },
+    "keyPackageDigest": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY",
+    "recipientDeliveryKey": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+  },
+  "admissionBinding": "WyJoeXBlcmtleS5hZG1pc3Npb24tYmluZGluZy52MSIseyJjb3B5SWQiOiJyZWNpcGllbnRfY29weV8wMDAwMDAwMDAwMDAwMDAwMDEiLCJncm91cElkIjoiaHlwZXJrZXlfdmVjdG9yX2dyb3VwXzAwMDAwMDAwMDAwMSIsInByb2ZpbGUiOiJoeXBlcmtleS52MSIsInJlY2lwaWVudERlbGl2ZXJ5S2V5IjoiQndjSEJ3Y0hCd2NIQndjSEJ3Y0hCd2NIQndjSEJ3Y0hCd2NIQndjSEJ3YyJ9XQ",
+  "challenge": "aHlwZXJrZXkuY29uZm9ybWFuY2UuY2hhbGxlbmdlLnYx",
+  "signature": "wZ06yT-5fbFsAL0txp0yfoCE5hZut_IMnFaBSjYneNUDcpE-EMtgagj45_gnlXjQkl7scLxAo6FlYKqaxU2OBg"
+}

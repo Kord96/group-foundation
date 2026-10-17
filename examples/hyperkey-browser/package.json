@@ -1,0 +1,12 @@
+{
+  "name": "hyperkey-browser-qualification",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.mjs", "test": "node qualification.test.mjs" },
+  "dependencies": {
+    "@group-foundation/hyperkey": "0.1.0",
+    "@group-foundation/group-core": "0.1.0",
+    "@group-foundation/group-admission": "0.1.0"
+  },
+  "devDependencies": { "playwright": "1.62.1" }
+}
