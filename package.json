@@ -3,6 +3,9 @@
   "private": true,
   "packageManager": "pnpm@11.1.2",
   "scripts": {
+    "qualify:release": "node scripts/qualify-release.mjs",
+    "check:packages": "node scripts/check-package-boundaries.mjs",
+    "test:release-tooling": "node --test scripts/release-utils.test.mjs",
     "check": "pnpm --recursive --if-present check",
     "build": "pnpm --recursive --if-present build",
     "test": "pnpm --recursive --if-present test"
