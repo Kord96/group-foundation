@@ -77,20 +77,30 @@ export class GroupAdmissionRuntime<Custody> {
     });
   }
   async submit(wire: Uint8Array): Promise<AdmissionProgress> {
-    const exact = new Uint8Array(wire), request = decodeAdmissionRequest(exact), hash = await this.digest(exact);
-    return this.write(async ({ ledger }) => {
-      this.scope(ledger, request.scope);
-      const prior = own(ledger.requests, request.requestId);
-      // Durable selected retries survive expiry/revocation; changed bytes always fail first.
-      if (prior) { assertExact(prior, exact, hash); return progress(ledger, request.requestId); }
+    const exact = new Uint8Array(wire);
+    return this.options.transactions.transact(transaction => this.commitSubmission(transaction, exact));
+  }
+  /**
+   * Validate and compose exact canonical request bytes in the caller's existing physical transaction.
+   * This method never opens or commits a transaction; the caller owns atomic commit and rollback.
+   */
+  async commitSubmission(transaction: AdmissionTransaction<Custody>, exactRequest: Uint8Array): Promise<AdmissionProgress> {
+    const { ledger } = transaction; validateCursor(ledger.group);
+    const exact = new Uint8Array(exactRequest), request = decodeAdmissionRequest(exact), hash = await this.digest(exact);
+    this.scope(ledger, request.scope);
+    const prior = own(ledger.requests, request.requestId);
+    // Durable selected retries survive expiry/revocation; changed bytes always fail first.
+    if (prior) assertExact(prior, exact, hash);
+    else {
       if (own(ledger.removals, request.requestId)) fail("conflict", "operation ID already names a removal");
       const now = this.now(), invitation = currentInvitation(ledger, request.invitationId, now);
       if (request.requestedAt > now || request.expiresAt <= now) fail("expired", "candidate request is outside validity interval");
       const verified = await this.options.candidates.verify(structuredClone(request), this.now()); this.checkCandidate(request, verified);
       if (request.expiresAt <= this.now() || invitation.definition.expiresAt <= this.now() || invitation.revokedAt !== undefined) fail("expired", "admission expired during validation");
       put(ledger.requests, request.requestId, { wire: exact, hash, state: invitation.definition.approval === "automatic" ? "approved" : "pending" });
-      return progress(ledger, request.requestId);
-    });
+    }
+    const result = progress(ledger, request.requestId); ledger.revision++;
+    return result;
   }
   async approve(requestId: string, actor: ActingMember): Promise<AdmissionProgress> { return this.decide(requestId, actor, "approve"); }
   async deny(requestId: string, actor: ActingMember): Promise<AdmissionProgress> { return this.decide(requestId, actor, "deny"); }

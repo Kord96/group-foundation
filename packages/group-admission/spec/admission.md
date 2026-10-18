@@ -71,6 +71,18 @@ even if a digest port collided. Explicit approval, denial and cancellation are
 management operations with separately authenticated actors. A selected Add is
 immutable; later management retries cannot undo it.
 
+`submit(exactRequest)` is the convenience transaction owner. It delegates to
+the public `commitSubmission(transaction, exactRequest)` composition method.
+The latter accepts canonical request bytes and performs decode, digest, scope,
+exact-ID retry, expiry and current candidate verification inside the caller's
+existing physical transaction. This lets a host commit a bootstrap-session
+handoff and the admission ledger insertion as one atomic write. The adapter
+must pass that existing transaction directly: it must not invoke `submit`, open
+a nested/second transaction, or mirror the admission ledger mutation itself.
+Any later callback failure rolls both effects back. An exact retry after an
+ambiguous commit reply returns durable progress without repeating candidate
+verification; changed bytes for the same request ID conflict first.
+
 A reservation contains `retryId` and an exclusive deadline bounded by the lease,
 candidate/request/invitation and governance deadlines. A different retry cannot
 steal an active reservation. Capacity checks count consumed uses plus other live
@@ -163,7 +175,9 @@ coverage and add Remove, Add-vs-Remove contention, expiry/revoke during detached
 work, expiry during custody composition, contention on a final use, changed
 request/retry/custody bytes, stale identity/governance/revision/epoch, loss of
 Add/Remove commit replies, altered recovery wire, selected Add recovery after
-request expiry/revocation, and independent authenticated installation.
+request expiry/revocation, caller-composed bootstrap handoff/submission rollback,
+lost submission replies with exact idempotent recovery, and independent
+authenticated installation.
 
 The in-memory transaction export is a test helper with serializable cloned
 drafts and atomic simulated custody. It does not claim disk durability or

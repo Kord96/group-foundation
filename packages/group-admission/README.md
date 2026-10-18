@@ -52,6 +52,30 @@ rolls all of them back. Governance/evidence ports must observe or fence the
 writer's current authority snapshot, including external authority changes.
 No callback may publish transport.
 
+The convenience `submit(exactRequest)` opens the configured transaction and
+delegates to `commitSubmission`. A caller that must atomically hand off a
+bootstrap session and admit its resulting request can use its existing physical
+writer instead:
+
+```ts
+await hostWriter(async transaction => {
+  await commitBootstrapSessionHandoff(transaction, session);
+  const progress = await runtime.commitSubmission(transaction, exactRequest);
+  return progress;
+});
+```
+
+`exactRequest` is the canonical request `Uint8Array`; `commitSubmission`
+decodes, digests, scopes, checks exact-ID retries, verifies current candidate
+evidence, and writes the admission ledger in that same transaction. It must be
+given the transaction already containing the caller's handoff. An adapter must
+not call `submit`, open a second transaction, or duplicate the request/ledger
+write. Commit the physical writer promptly after `commitSubmission` returns.
+Callback or commit failure must roll back both caller and admission effects;
+after an ambiguous commit reply, retry the same exact bytes to recover the
+durable progress. Changed bytes under the same request ID conflict before any
+new evidence verification or ledger write.
+
 The convenience `select`/`remove` methods reserve, stage, and ask this host
 transaction port to compose selection. For an existing caller writer use:
 

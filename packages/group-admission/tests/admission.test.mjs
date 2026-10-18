@@ -18,19 +18,22 @@ const request = (id = "candidate", changes = {}) => ({ schema: ADMISSION_SCHEMA,
   keyPackage: bytes(`key-package:${id}`), keyPackageDigest: digest(bytes(`key-package:${id}`)), proof: bytes("candidate proof"),
   requestedAt: 1, expiresAt: 100, ...changes });
 const code = expected => error => error.code === expected;
-function setup({ compose, prepare } = {}) {
-  const environment = { now: 2, authority: "policy:1", candidate: "identity:1", prepares: 0, authCalls: [], deny: false, candidateValidUntil: 200, authorityValidUntil: 200 };
+function setup({ compose, prepare, transactionFactory } = {}) {
+  const environment = { now: 2, authority: "policy:1", candidate: "identity:1", candidateCalls: 0, prepares: 0, authCalls: [], deny: false, candidateValidUntil: 200, authorityValidUntil: 200 };
   const group = { scope, revision: 0, epoch: "9007199254740992", predecessor: "genesis" };
-  const transactions = new InMemoryAdmissionTransactions(createAdmissionLedger(group), { revision: 0, secret: "private" }, async (current, stage) => {
+  const composeCustody = async (current, stage) => {
     assert.equal(current.revision, stage.expected.revision, "physical custody CAS");
     assert.equal(stage.custodyDigest, digest(bytes(JSON.stringify(stage.custody))), "physical custody digest binding");
     if (compose) await compose(environment, current, stage);
     return stage.custody;
-  });
+  };
+  const transactions = transactionFactory
+    ? transactionFactory(createAdmissionLedger(group), { revision: 0, secret: "private" }, composeCustody)
+    : new InMemoryAdmissionTransactions(createAdmissionLedger(group), { revision: 0, secret: "private" }, composeCustody);
   const delivery = new RecordingDelivery();
   const runtime = new GroupAdmissionRuntime({ transactions, delivery, now: () => environment.now, reservationDuration: 20,
     digest: { async digest(value) { return digest(value); } },
-    candidates: { async verify(value) { return { member: value.member, revision: environment.candidate, validUntil: environment.candidateValidUntil }; } },
+    candidates: { async verify(value) { environment.candidateCalls++; return { member: value.member, revision: environment.candidate, validUntil: environment.candidateValidUntil }; } },
     actors: { async verify(input) { environment.authCalls.push(input); return input.actor.member; } },
     installations: { async verify({ receipt }) { assert.deepEqual(receipt.acknowledgement, bytes("signed acknowledgement")); } },
     governance: { async authorize(input) { if (environment.deny && ["add", "remove"].includes(input.action)) throw new Error("current actor removed"); return { revision: environment.authority, validUntil: environment.authorityValidUntil }; } },
@@ -56,6 +59,28 @@ function removal(group, changes = {}) { return { schema: REMOVAL_SCHEMA, operati
 function receipt(candidate, selected, changes = {}) { return { schema: INSTALLATION_SCHEMA, operationId: candidate.requestId, scope, selectedWireHash: selected.wireHash,
   successor: selected.selection.next.predecessor, recipient: candidate.member, installedAt: 3, acknowledgement: bytes("signed acknowledgement"), ...changes }; }
 
+class SessionAdmissionTransactions {
+  #ledger;
+  #session = "bootstrap-pending";
+  #writer = Promise.resolve();
+  loseNextCommitReply = false;
+  constructor(ledger) { this.#ledger = structuredClone(ledger); }
+  async read() { return structuredClone(this.#ledger); }
+  async readSession() { return this.#session; }
+  async transact(operation) {
+    const previous = this.#writer; let release;
+    this.#writer = new Promise(resolve => { release = resolve; }); await previous;
+    try {
+      const transaction = { ledger: structuredClone(this.#ledger), session: this.#session,
+        async stageCustody() { throw new Error("submission must not stage custody"); } };
+      const result = await operation(transaction);
+      this.#ledger = structuredClone(transaction.ledger); this.#session = transaction.session;
+      if (this.loseNextCommitReply) { this.loseNextCommitReply = false; throw new Error("physical commit reply lost"); }
+      return structuredClone(result);
+    } finally { release(); }
+  }
+}
+
 test("canonical neutral request supports absent or opaque delivery binding and rejects predecessor schemas", () => {
   for (const value of [request(), request("bound", { deliveryBinding: bytes("opaque non-key data") })]) {
     const wire = encodeAdmissionRequest(value);
@@ -77,6 +102,50 @@ test("request wire rejects alternate base64, duplicate fields, invalid UTF8, and
   }
   assert.throws(() => decodeAdmissionRequest(new Uint8Array([0xff])));
   assert.throws(() => encodeAdmissionRequest(request("large", { credential: new Uint8Array(17000) })));
+});
+
+test("caller-composed submission rolls back session handoff and admission together before physical commit", async () => {
+  const { runtime, transactions } = setup({ transactionFactory: ledger => new SessionAdmissionTransactions(ledger) });
+  await invite(runtime); const before = await transactions.read(), exact = encodeAdmissionRequest(request());
+  await assert.rejects(transactions.transact(async transaction => {
+    transaction.session = "bootstrap-handed-off";
+    await runtime.commitSubmission(transaction, exact);
+    throw new Error("crash before physical commit");
+  }), /crash before physical commit/u);
+  assert.equal(await transactions.readSession(), "bootstrap-pending");
+  assert.equal((await transactions.read()).requests.candidate, undefined);
+  assert.equal((await transactions.read()).revision, before.revision);
+});
+
+test("caller-composed submission survives a lost commit reply and exact retry without revalidating candidate", async () => {
+  const { runtime, transactions, environment } = setup({ transactionFactory: ledger => new SessionAdmissionTransactions(ledger) });
+  await invite(runtime); const exact = encodeAdmissionRequest(request());
+  transactions.loseNextCommitReply = true;
+  await assert.rejects(transactions.transact(async transaction => {
+    transaction.session = "bootstrap-handed-off";
+    return runtime.commitSubmission(transaction, exact);
+  }), /physical commit reply lost/u);
+  assert.equal(await transactions.readSession(), "bootstrap-handed-off");
+  assert.deepEqual((await transactions.read()).requests.candidate.wire, exact);
+  assert.equal(environment.candidateCalls, 1);
+  const retry = await transactions.transact(transaction => runtime.commitSubmission(transaction, exact));
+  assert.equal(retry.state, "approved");
+  assert.equal(environment.candidateCalls, 1);
+  await assert.rejects(transactions.transact(async transaction => {
+    transaction.session = "must-roll-back";
+    return runtime.commitSubmission(transaction, encodeAdmissionRequest(request("candidate", { proof: bytes("changed") })));
+  }), code("conflict"));
+  assert.equal(await transactions.readSession(), "bootstrap-handed-off");
+});
+
+test("submit delegates exact wire admission to commitSubmission", async () => {
+  const { runtime, transactions } = setup(); await invite(runtime);
+  const commitSubmission = runtime.commitSubmission.bind(runtime); let calls = 0;
+  runtime.commitSubmission = async (transaction, exactRequest) => { calls++; return commitSubmission(transaction, exactRequest); };
+  const exact = encodeAdmissionRequest(request());
+  assert.equal((await runtime.submit(exact)).state, "approved");
+  assert.equal(calls, 1);
+  assert.deepEqual((await transactions.read()).requests.candidate.wire, exact);
 });
 
 test("explicit approval, denial, cancellation and scoped immutable invitations", async () => {
