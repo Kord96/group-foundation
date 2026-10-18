@@ -1,5 +1,4 @@
 import { base64urlToBytes, bytesToBase64url, canonicalJson } from "@group-foundation/group-core/encoding";
-import { decodeAdmissionRequest } from "../wire.js";
 import {
   BOOTSTRAP_LIMITS, BOOTSTRAP_PRESENTATION_SCHEMA, BootstrapError,
   type BootstrapPresentation, type UnsignedBootstrapPresentation,
@@ -70,10 +69,11 @@ export function bootstrapPresentationJson(value: BootstrapPresentation | Unsigne
     schema: value.schema, mode: value.mode, sessionId: value.sessionId, presenterRole: value.presenterRole,
     createdAtMs: value.createdAtMs, expiresAtMs: value.expiresAtMs, nonce: bytesToBase64url(value.nonce),
     suite: value.suite, verificationKey: bytesToBase64url(value.verificationKey),
+    channelSuite: value.channelSuite, channelOffer: bytesToBase64url(value.channelOffer),
   };
   const payload = value.mode === "offer-target"
     ? { target: bytesToBase64url(value.target) }
-    : { membershipRequest: bytesToBase64url(value.membershipRequest) };
+    : { candidate: bytesToBase64url(value.candidate) };
   const proof = includeProof ? { proof: bytesToBase64url((value as BootstrapPresentation).proof) } : {};
   return { ...common, ...payload, ...proof };
 }
@@ -84,13 +84,13 @@ function validateCommon(value: BootstrapPresentation | UnsignedBootstrapPresenta
   if (value.expiresAtMs <= value.createdAtMs) bootstrapFail("clock", "presentation expiry must follow creation");
   bootstrapBytes(value.nonce, BOOTSTRAP_LIMITS.nonceBytes, "nonce", BOOTSTRAP_LIMITS.nonceBytes);
   validateSuite(value.suite); bootstrapBytes(value.verificationKey, BOOTSTRAP_LIMITS.verificationKeyBytes, "verificationKey");
+  validateSuite(value.channelSuite); bootstrapBytes(value.channelOffer, BOOTSTRAP_LIMITS.channelOfferBytes, "channelOffer");
   if (value.mode === "offer-target") {
     if (value.presenterRole !== "admission-host") bootstrapFail("role", "offer-target must be presented by the admission host");
     bootstrapBytes(value.target, BOOTSTRAP_LIMITS.targetBytes, "target");
   } else if (value.mode === "request-membership") {
     if (value.presenterRole !== "candidate") bootstrapFail("role", "request-membership must be presented by the candidate");
-    const requestWire = bootstrapBytes(value.membershipRequest, BOOTSTRAP_LIMITS.requestBytes, "membershipRequest");
-    decodeAdmissionRequest(requestWire);
+    bootstrapBytes(value.candidate, BOOTSTRAP_LIMITS.candidateBytes, "candidate");
   } else bootstrapFail("invalid-wire", "unsupported bootstrap mode");
 }
 
@@ -110,20 +110,21 @@ export function decodeBootstrapPresentation(wire: Uint8Array): BootstrapPresenta
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) bootstrapFail("invalid-wire", "bootstrap presentation must be an object");
   const row0 = parsed as Record<string, unknown>;
   const mode = row0.mode;
-  const common = ["schema", "mode", "sessionId", "presenterRole", "createdAtMs", "expiresAtMs", "nonce", "suite", "verificationKey", "proof"];
-  const row = exact(parsed, mode === "offer-target" ? [...common, "target"] : mode === "request-membership" ? [...common, "membershipRequest"] : common);
+  const common = ["schema", "mode", "sessionId", "presenterRole", "createdAtMs", "expiresAtMs", "nonce", "suite", "verificationKey", "channelSuite", "channelOffer", "proof"];
+  const row = exact(parsed, mode === "offer-target" ? [...common, "target"] : mode === "request-membership" ? [...common, "candidate"] : common);
   if (row.schema !== BOOTSTRAP_PRESENTATION_SCHEMA) bootstrapFail("invalid-wire", "unsupported bootstrap presentation schema");
   const base = {
     schema: BOOTSTRAP_PRESENTATION_SCHEMA, sessionId: validateSessionId(row.sessionId),
     createdAtMs: bootstrapUnixMs(row.createdAtMs, "createdAtMs"), expiresAtMs: bootstrapUnixMs(row.expiresAtMs, "expiresAtMs"),
     nonce: wireBytes(row.nonce, BOOTSTRAP_LIMITS.nonceBytes, "nonce", BOOTSTRAP_LIMITS.nonceBytes),
     suite: validateSuite(row.suite), verificationKey: wireBytes(row.verificationKey, BOOTSTRAP_LIMITS.verificationKeyBytes, "verificationKey"),
+    channelSuite: validateSuite(row.channelSuite), channelOffer: wireBytes(row.channelOffer, BOOTSTRAP_LIMITS.channelOfferBytes, "channelOffer"),
     proof: wireBytes(row.proof, BOOTSTRAP_LIMITS.proofBytes, "proof"),
   };
   const value: BootstrapPresentation = mode === "offer-target"
     ? { ...base, mode, presenterRole: row.presenterRole as "admission-host", target: wireBytes(row.target, BOOTSTRAP_LIMITS.targetBytes, "target") }
     : mode === "request-membership"
-      ? { ...base, mode, presenterRole: row.presenterRole as "candidate", membershipRequest: wireBytes(row.membershipRequest, BOOTSTRAP_LIMITS.requestBytes, "membershipRequest") }
+      ? { ...base, mode, presenterRole: row.presenterRole as "candidate", candidate: wireBytes(row.candidate, BOOTSTRAP_LIMITS.candidateBytes, "candidate") }
       : bootstrapFail("invalid-wire", "unsupported bootstrap mode");
   validateCommon(value); return value;
 }

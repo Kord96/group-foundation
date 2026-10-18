@@ -14,10 +14,11 @@ the same host-selected clock domain and unit. That clock must remain comparable
 across process restarts; deadlines are exclusive.
 
 The `@group-foundation/group-admission/bootstrap` subpath provides signed,
-canonical `offer-target` and `request-membership` presentations plus a durable
-local handoff state machine. Bootstrap wire time is explicitly Unix
-milliseconds; it is separate from the admission runtime's host clock. The
-subpath owns no QR renderer, camera, transport, target resolver, product role,
+canonical `offer-target` and candidate-first `request-membership` presentations,
+an encrypted duplex message state machine through injected crypto, and a durable
+exact-request handoff. Bootstrap wire time is explicitly Unix milliseconds; it
+is separate from the admission runtime's host clock. The subpath owns no QR
+renderer, camera, carrier, target resolver, product role, crypto implementation,
 or admission ledger. See [the bootstrap protocol](spec/bootstrap.md).
 
 ## Host ports

@@ -37,7 +37,6 @@ export function validateBootstrapSession(value: BootstrapSessionSnapshot): Boots
   const hasRequest = value.requestWire !== undefined || value.requestSha256 !== undefined;
   if (hasRequest !== (value.requestWire !== undefined && value.requestSha256 !== undefined)) bootstrapFail("invalid-input", "request wire and digest must be stored together");
   if (value.requestWire !== undefined) { bootstrapBytes(value.requestWire, BOOTSTRAP_LIMITS.requestBytes, "requestWire"); decodeAdmissionRequest(value.requestWire); validateSha256(value.requestSha256, "requestSha256"); }
-  if (value.mode === "request-membership" && !hasRequest) bootstrapFail("invalid-input", "request-membership session lost its request");
   if (value.phase === "open" && hasRequest || ["request-ready", "submitted", "completed"].includes(value.phase) && !hasRequest) bootstrapFail("invalid-input", "session phase differs from request state");
   if (value.submission !== undefined) {
     if (Object.keys(value.submission).sort().join(",") !== "submissionId,submittedAtMs") bootstrapFail("invalid-input", "invalid submission receipt");
@@ -68,16 +67,13 @@ function live(state: BootstrapSessionSnapshot, nowMs: number): BootstrapTransiti
   return undefined;
 }
 
-export async function createBootstrapSession(inspection: BootstrapPresentationInspection, localRole: BootstrapRole, hashes: BootstrapSha256Port): Promise<BootstrapSessionSnapshot> {
+export function createBootstrapSession(inspection: BootstrapPresentationInspection, localRole: BootstrapRole): BootstrapSessionSnapshot {
   if (![inspection.presentation.presenterRole, otherRole(inspection.presentation.presenterRole)].includes(localRole)) bootstrapFail("role", "local bootstrap role is invalid");
-  const requestWire = inspection.presentation.mode === "request-membership" ? new Uint8Array(inspection.presentation.membershipRequest) : undefined;
-  const requestSha256 = requestWire === undefined ? undefined : await bootstrapSha256(requestWire, hashes);
   const state: BootstrapSessionSnapshot = {
     schema: BOOTSTRAP_SESSION_SCHEMA, sessionId: inspection.presentation.sessionId, mode: inspection.presentation.mode,
     localRole, remoteRole: otherRole(localRole), presentationWire: new Uint8Array(inspection.wire), presentationSha256: inspection.wireSha256,
     createdAtMs: inspection.presentation.createdAtMs, expiresAtMs: inspection.presentation.expiresAtMs,
-    phase: requestWire === undefined ? "open" : "request-ready", revision: 0,
-    ...(requestWire === undefined ? {} : { requestWire, requestSha256: requestSha256! }),
+    phase: "open", revision: 0,
   };
   return validateBootstrapSession(state);
 }
@@ -96,7 +92,6 @@ export async function resumeBootstrapSession(
 
 export async function attachBootstrapMembershipRequest(snapshot: BootstrapSessionSnapshot, requestWire: Uint8Array, hashes: BootstrapSha256Port, nowMs: number): Promise<BootstrapTransition> {
   const state = validateBootstrapSession(snapshot);
-  if (state.mode !== "offer-target") bootstrapFail("transition", "request-membership presentations already bind their request");
   const expiration = live(state, nowMs); if (expiration) return expiration;
   bootstrapBytes(requestWire, BOOTSTRAP_LIMITS.requestBytes, "requestWire"); decodeAdmissionRequest(requestWire);
   const requestSha256 = await bootstrapSha256(requestWire, hashes);

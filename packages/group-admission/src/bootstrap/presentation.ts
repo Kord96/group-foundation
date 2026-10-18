@@ -1,5 +1,4 @@
 import { bytesToBase64url } from "@group-foundation/group-core/encoding";
-import { decodeAdmissionRequest } from "../wire.js";
 import {
   BOOTSTRAP_LIMITS, BOOTSTRAP_PRESENTATION_SCHEMA, BootstrapError,
   type BootstrapEntropyPort, type BootstrapInspectionPolicy, type BootstrapPresentation,
@@ -36,10 +35,11 @@ export async function createBootstrapPresentation(
     schema: BOOTSTRAP_PRESENTATION_SCHEMA, sessionId: bytesToBase64url(sessionBytes),
     createdAtMs: input.createdAtMs, expiresAtMs: input.expiresAtMs, nonce: new Uint8Array(nonce),
     suite: dependencies.signer.suite, verificationKey: new Uint8Array(dependencies.signer.verificationKey),
+    channelSuite: input.channelSuite, channelOffer: new Uint8Array(input.channelOffer),
   };
   const unsigned: UnsignedBootstrapPresentation = input.mode === "offer-target"
     ? { ...common, mode: input.mode, presenterRole: "admission-host", target: new Uint8Array(input.target) }
-    : { ...common, mode: input.mode, presenterRole: "candidate", membershipRequest: new Uint8Array(input.membershipRequest) };
+    : { ...common, mode: input.mode, presenterRole: "candidate", candidate: new Uint8Array(input.candidate) };
   validateUnsignedBootstrapPresentation(unsigned);
   let proof: Uint8Array;
   try { proof = await dependencies.signer.sign(bootstrapPresentationTranscript(unsigned)); }
@@ -81,7 +81,6 @@ export async function inspectBootstrapPresentation(
   const result: BootstrapPresentationInspection = {
     presentation, wire: new Uint8Array(wire), wireSha256: await bootstrapSha256(wire, dependencies.hashes),
     localRole, remoteRole: presentation.presenterRole,
-    ...(presentation.mode === "request-membership" ? { membershipRequest: decodeAdmissionRequest(presentation.membershipRequest) } : {}),
   };
   return result;
 }
