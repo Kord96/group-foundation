@@ -12,6 +12,15 @@ const expectedDependencies = {
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = async path => JSON.parse(await readFile(path, 'utf8'));
 
+export function validateReleaseVersions(manifests, cargoManifest) {
+  const versions = packageNames.map(name => manifests[name]?.version);
+  for (const version of versions) assert.match(version ?? '', /^\d+\.\d+\.\d+$/u, 'npm package release version must be exact semver');
+  assert.equal(new Set(versions).size, 1, 'Foundation npm package versions must match');
+  const crateVersion = /^version\s*=\s*"([^"]+)"/mu.exec(cargoManifest)?.[1];
+  assert.equal(crateVersion, versions[0], 'Foundation Rust crate and npm package versions must match');
+  return versions[0];
+}
+
 export function validateManifest(manifest, name, packed = false) {
   assert.equal(manifest.name, scope + name);
   assert.equal(manifest.private, undefined, `${name} must be publishable`);

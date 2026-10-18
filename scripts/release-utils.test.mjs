@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { compareGenerated, readArchive, validateImport, validateManifest, validatePacked } from './release-utils.mjs';
+import { compareGenerated, readArchive, validateImport, validateManifest, validatePacked, validateReleaseVersions } from './release-utils.mjs';
 
 function archive(name = 'package/package.json', type = '0', body = '{}') {
   const header = Buffer.alloc(512), content = Buffer.from(body);
@@ -15,6 +15,18 @@ function archive(name = 'package/package.json', type = '0', body = '{}') {
   return gzipSync(Buffer.concat([header, content, Buffer.alloc((512 - content.length % 512) % 512 + 1024)]));
 }
 const core = { name: '@group-foundation/group-core', version: '0.1.0', exports: { '.': { import: './dist/index.js', types: './dist/index.d.ts' } } };
+
+test('release closure requires one exact npm and Rust crate version', () => {
+  const manifests = {
+    'group-core': core,
+    'group-admission': { version: '0.1.0' },
+    hyperkey: { version: '0.1.0' },
+  };
+  assert.equal(validateReleaseVersions(manifests, '[package]\nversion = "0.1.0"\n'), '0.1.0');
+  assert.throws(() => validateReleaseVersions({ ...manifests, hyperkey: { version: '0.2.0' } }, '[package]\nversion = "0.1.0"\n'), /versions must match/u);
+  assert.throws(() => validateReleaseVersions(manifests, '[package]\nversion = "0.2.0"\n'), /Rust crate/u);
+  assert.throws(() => validateReleaseVersions({ ...manifests, hyperkey: { version: 'latest' } }, '[package]\nversion = "0.1.0"\n'), /exact semver/u);
+});
 
 test('archive parser rejects traversal, links, duplicate files, truncation, and corrupt checksums', () => {
   assert.equal(readArchive(archive(), 'package').get('package.json').toString(), '{}');

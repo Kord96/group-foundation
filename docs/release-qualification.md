@@ -3,6 +3,8 @@
 Run `pnpm qualify:release` from the repository root before releasing Foundation.
 Every phase is required; a missing tool, browser, artifact, or failed assertion
 exits nonzero. This command does not publish packages or change versions.
+The gate also requires all three npm package versions and the Rust crate version
+to match so the qualified archives form one immutable release closure.
 
 Prerequisites:
 

@@ -4,7 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compareGenerated, json, packageNames, readArchive, scope, sha256, validatePacked } from './release-utils.mjs';
+import { compareGenerated, json, packageNames, readArchive, scope, sha256, validatePacked, validateReleaseVersions } from './release-utils.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -33,6 +33,8 @@ async function step(name, action) {
 }
 const node = (args, options) => run(process.execPath, args, options);
 const manifests = Object.fromEntries(await Promise.all(packageNames.map(async name => [name, await json(resolve(root, 'packages', name, 'package.json'))])));
+const cargoManifest = await readFile(resolve(root, 'packages/group-core/rust/Cargo.toml'), 'utf8');
+report.version = validateReleaseVersions(manifests, cargoManifest);
 
 try {
   assert(Number(process.versions.node.split('.')[0]) >= 22, 'Node 22 or newer is required');
@@ -106,7 +108,6 @@ try {
   });
   await step('packaged Cargo crate qualification', async () => {
     await run('cargo', ['package', '--locked', '--allow-dirty', '--package', 'group-foundation-core']);
-    const cargoManifest = await readFile(resolve(root, 'packages/group-core/rust/Cargo.toml'), 'utf8');
     const version = /^version\s*=\s*"([^"]+)"/mu.exec(cargoManifest)?.[1];
     assert(version, 'Cargo crate version missing');
     const prefix = `group-foundation-core-${version}`;

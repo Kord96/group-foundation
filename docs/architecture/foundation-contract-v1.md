@@ -46,7 +46,8 @@ imports a consumer package. HyperKey is not a Zagel runtime dependency.
   imports in Zagel.
 - New neutral protocol/schema namespaces are `group-foundation.*` and
   `hyperkey.*`; preview data is reset and predecessor values are rejected.
-- Initial published packages are `0.1.0` and are pinned immutably by consumers.
+- Consumers pin one immutable, version-aligned Foundation release closure. The
+  initial closure was `0.1.0`; the admission-bootstrap v2 clean break is `0.2.0`.
 - The current MLS/OpenMLS/toolchain versions are preserved until a separately
   reviewed compatibility migration.
 - The current Zagel BFU remains in Zagel.

@@ -1,8 +1,8 @@
 # HyperKey
 
-`@group-foundation/hyperkey@0.1.0` owns one immutable conventional Ed25519
+`@group-foundation/hyperkey@0.2.0` owns one immutable conventional Ed25519
 key, its public descriptor and independently admitted Copies. Its only runtime
-dependencies are exact `0.1.0` releases of `@group-foundation/group-core` and
+dependencies are exact `0.2.0` releases of `@group-foundation/group-core` and
 `@group-foundation/group-admission`.
 
 A Copy has an independent MLS identity, KeyPackage and X25519 delivery key. None

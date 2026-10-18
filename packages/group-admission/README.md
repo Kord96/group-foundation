@@ -3,7 +3,7 @@
 `@group-foundation/group-admission` provides generic invitation, candidate,
 approval, reservation, Add/Remove selection, durable public outbox, and
 installation receipt coordination. It depends only on
-`@group-foundation/group-core@0.1.0` for member identity and canonical primitives.
+`@group-foundation/group-core@0.2.0` for member identity and canonical primitives.
 It contains no native MLS implementation.
 
 Scopes and identifiers are bounded opaque strings. A scope must bind all of the
