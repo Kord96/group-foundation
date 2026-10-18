@@ -13,6 +13,13 @@ service, or private snapshot format. All instants and `reservationDuration` use
 the same host-selected clock domain and unit. That clock must remain comparable
 across process restarts; deadlines are exclusive.
 
+The `@group-foundation/group-admission/bootstrap` subpath provides signed,
+canonical `offer-target` and `request-membership` presentations plus a durable
+local handoff state machine. Bootstrap wire time is explicitly Unix
+milliseconds; it is separate from the admission runtime's host clock. The
+subpath owns no QR renderer, camera, transport, target resolver, product role,
+or admission ledger. See [the bootstrap protocol](spec/bootstrap.md).
+
 ## Host ports
 
 Construct `GroupAdmissionRuntime<Custody>` with explicit ports:

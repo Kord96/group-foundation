@@ -13,8 +13,9 @@ a transport, database, identity service, profile, or UI.
   the Rust/WASM engine, and conformance vectors.
 - `@group-foundation/group-admission` owns generic invitations, candidate
   requests, reservations, approvals, add/remove selection, publication and
-  installation receipts. Candidate verification and authorization are injected
-  through ports.
+  installation receipts, plus signed bootstrap presentation and local handoff
+  state. Candidate verification and authorization are injected through ports;
+  QR rendering, cameras, transports, and product policy remain consumers.
 - `@group-foundation/hyperkey` owns a logical conventional Ed25519 key, its
   immutable descriptor, independently admitted Copies, private seed delivery,
   and Copy workflow. It depends only on the two Foundation packages.
