@@ -437,6 +437,19 @@ export class NativeProductClient {
         return v1;
     }
     /**
+     * Generate an independent successor signer without changing this custody.
+     * The opaque signing state must be durably retained by the host while the
+     * product authorizes the exact public successor key.
+     * @returns {ProductSignerHandoverCandidate}
+     */
+    prepareSignerHandover() {
+        const ret = wasm.nativeproductclient_prepareSignerHandover(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * @param {Uint8Array} key
      * @returns {Uint8Array | undefined}
      */
@@ -651,6 +664,31 @@ export class NativeProductClient {
         const ptr1 = passArray8ToWasm0(aad, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.nativeproductclient_stageSelfRemove(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * Produce one self-update that replaces this client's active local MLS
+     * signer. The source is unchanged. The result contains only successor
+     * custody; the predecessor signer is deleted from its provider state.
+     * @param {Uint8Array} group_id
+     * @param {Uint8Array} successor_signing_state
+     * @param {Uint8Array} credential
+     * @param {Uint8Array} aad
+     * @returns {ProductSignerHandoverStage}
+     */
+    stageSignerHandover(group_id, successor_signing_state, credential, aad) {
+        const ptr0 = passArray8ToWasm0(group_id, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(successor_signing_state, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray8ToWasm0(credential, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray8ToWasm0(aad, wasm.__wbindgen_malloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.nativeproductclient_stageSignerHandover(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
