@@ -21,6 +21,8 @@ export interface ProductKeyPackageStage { custody: Uint8Array; keyPackage: Uint8
 export interface ProductComponentUpdate { id: number; value: Uint8Array | null; }
 export interface ProductCommitRequest { additions: Uint8Array[]; removals: number[]; componentUpdates: ProductComponentUpdate[]; proposalReferences?: Uint8Array[]; }
 export interface ProductCommitStage extends ProductStage { commit: Uint8Array; welcome?: Uint8Array; pendingCustody: Uint8Array; }
+export interface ProductSignerHandoverCandidate { signingState: Uint8Array; signingKey: Uint8Array; }
+export interface ProductSignerHandoverStage extends ProductStage { commit: Uint8Array; predecessorSigningKey: Uint8Array; successorSigningKey: Uint8Array; }
 export interface ProductMessageStage extends ProductStage { kind: 'commit' | 'proposal' | 'application'; sender: Uint8Array; credential: Uint8Array; aad: Uint8Array; messageEpoch: string; componentUpdates: ProductComponentUpdate[]; proposals: ProductProposal[]; plaintext?: Uint8Array; resultingContext?: Uint8Array; selfRemoved?: boolean; }
 export interface ProductFrameStage extends ProductStage { frame: Uint8Array; }
 export interface ProductRecord { key: Uint8Array; value: Uint8Array | null; }
@@ -240,6 +242,19 @@ impl NativeProductClient {
         )?;
         Ok(out)
     }
+
+    /// Generate an independent successor signer without changing this custody.
+    /// The opaque signing state must be durably retained by the host while the
+    /// product authorizes the exact public successor key.
+    #[wasm_bindgen(js_name = prepareSignerHandover, unchecked_return_type = "ProductSignerHandoverCandidate")]
+    pub fn prepare_signer_handover(&self) -> std::result::Result<JsValue, JsError> {
+        let provider = Provider::new();
+        let signer = SigningIdentity::generate(&provider).map_err(error)?;
+        let out = object();
+        bytes(&out, "signingState", &signer.export_state())?;
+        bytes(&out, "signingKey", signer.public())?;
+        Ok(out)
+    }
     #[wasm_bindgen(unchecked_return_type = "ProductProjection")]
     pub fn inspect(&self, group_id: &[u8]) -> std::result::Result<JsValue, JsError> {
         projection(&self.provider, &self.group(group_id)?, &self.signer)
@@ -447,6 +462,47 @@ impl NativeProductClient {
         if let Some(welcome) = commit.welcome {
             bytes(&out, "welcome", &welcome)?;
         }
+        Ok(out)
+    }
+
+    /// Produce one self-update that replaces this client's active local MLS
+    /// signer. The source is unchanged. The result contains only successor
+    /// custody; the predecessor signer is deleted from its provider state.
+    #[wasm_bindgen(js_name = stageSignerHandover, unchecked_return_type = "ProductSignerHandoverStage")]
+    pub fn stage_signer_handover(
+        &self,
+        group_id: &[u8],
+        successor_signing_state: &[u8],
+        credential: &[u8],
+        aad: &[u8],
+    ) -> std::result::Result<JsValue, JsError> {
+        let mut next = self.detached()?;
+        let predecessor_key = next.signer.to_public_vec();
+        let successor =
+            SigningIdentity::from_state(&next.provider, successor_signing_state).map_err(error)?;
+        let successor_key = successor.to_public_vec();
+        let successor_credential = CredentialWithKey {
+            credential: Credential::tls_deserialize_exact(credential).map_err(error)?,
+            signature_key: successor_key.clone().into(),
+        };
+        let mut group = next.group(group_id)?;
+        next.provider
+            .set_product_aad(&mut group, aad.to_vec())
+            .map_err(error)?;
+        let handover = next
+            .provider
+            .prepare_product_signer_handover(
+                &mut group,
+                &next.signer,
+                successor,
+                successor_credential,
+            )
+            .map_err(error)?;
+        next.signer = handover.successor;
+        let out = next.result(&group)?;
+        bytes(&out, "commit", &handover.commit)?;
+        bytes(&out, "predecessorSigningKey", &predecessor_key)?;
+        bytes(&out, "successorSigningKey", &successor_key)?;
         Ok(out)
     }
     #[wasm_bindgen(js_name = stageMergePending, unchecked_return_type = "ProductStage")]

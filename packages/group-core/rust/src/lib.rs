@@ -27,7 +27,7 @@ mod product_wasm;
 pub use product::{
     MAX_NATIVE_EXTENSION_BYTES, ProductCommit, ProductCommitRequest, ProductGroup,
     ProductJoinLimits, ProductMessageInfo, ProductMessageMode, ProductProfileHooks,
-    SigningIdentity,
+    ProductSignerHandover, SigningIdentity,
 };
 #[cfg(feature = "wasm")]
 pub use product_wasm::NativeProductClient;

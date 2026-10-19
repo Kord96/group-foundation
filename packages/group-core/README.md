@@ -28,6 +28,12 @@ member proofs. They have distinct custody formats and cannot restore one another
 See [the native facade contract](spec/product-browser.md) for profile inputs,
 message authentication, proposal origins, terminal deletion, and checkpoints.
 
+`prepareSignerHandover` and `stageSignerHandover` provide the narrow native
+custody primitive for replacing a physical owner's active local signer. The
+operation is an MLS self-update, preserves the local leaf, returns successor-only
+custody and never exposes an arbitrary signing function. Product policy and the
+atomic signer/configuration installation remain with the consuming host.
+
 Private snapshots must be authenticated and sealed by the host. The host commits
 its semantic state, core custody, and exact outbox bytes in one physical
 transaction before publishing. `NativeGroupTransitionStoragePort` defines revision

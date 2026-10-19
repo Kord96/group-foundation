@@ -56,6 +56,15 @@ pub struct ProductCommit {
     pub welcome: Option<Vec<u8>>,
 }
 
+/// One detached local-signing-custody replacement.  The MLS Commit is signed
+/// by the current leaf key while its UpdatePath installs the successor key.
+/// The successor signer is returned only to the caller's detached custody; a
+/// host still owns the atomic installation of that custody and its binding.
+pub struct ProductSignerHandover {
+    pub commit: Vec<u8>,
+    pub successor: SigningIdentity,
+}
+
 #[derive(Clone, Copy)]
 pub enum ProductMessageMode {
     Member,
@@ -221,6 +230,15 @@ impl SigningIdentity {
     pub fn to_public_vec(&self) -> Vec<u8> {
         self.signer.to_public_vec()
     }
+
+    fn remove_from(&self, provider: &Provider) -> Result<()> {
+        SignatureKeyPair::delete(
+            provider.storage(),
+            self.signer.public(),
+            self.signer.signature_scheme(),
+        )
+        .map_err(mls)
+    }
 }
 
 impl Signer for SigningIdentity {
@@ -347,6 +365,62 @@ impl Provider {
                         .map_err(mls)
                 })
                 .transpose()?,
+        })
+    }
+
+    /// Rotate the active local leaf to an independently prepared signing
+    /// identity.  This is deliberately separate from generic membership
+    /// changes: it cannot add/remove members or expose either private key.
+    /// The operation runs on detached custody, commits no queued proposals,
+    /// and removes the predecessor signer from the resulting provider.
+    pub fn prepare_product_signer_handover(
+        &self,
+        group: &mut ProductGroup,
+        predecessor: &SigningIdentity,
+        successor: SigningIdentity,
+        credential: CredentialWithKey,
+    ) -> Result<ProductSignerHandover> {
+        self.require_product_signer(group, predecessor)?;
+        if predecessor.public() == successor.public() {
+            return Err(GroupError::Invalid(
+                "successor signing custody equals predecessor",
+            ));
+        }
+        if credential.signature_key.as_slice() != successor.public() {
+            return Err(GroupError::Invalid(
+                "successor credential differs from signing custody",
+            ));
+        }
+        let bundle = NewSignerBundle {
+            signer: &successor,
+            credential_with_key: credential,
+        };
+        let (commit, _, _) = group
+            .inner
+            .commit_builder()
+            .load_psks(self.storage())
+            .map_err(mls)?
+            .build_with_new_signer(self.rand(), self.crypto(), predecessor, bundle, |_| false)
+            .map_err(mls)?
+            .stage_commit(self)
+            .map_err(mls)?
+            .into_contents();
+        self.merge_product_pending(group)?;
+        let local = group
+            .members()
+            .find(|member| member.index == group.own_leaf_index())
+            .ok_or(GroupError::Invalid(
+                "local member is absent after signer handover",
+            ))?;
+        if local.signature_key.as_slice() != successor.public() {
+            return Err(GroupError::Invalid(
+                "signer handover did not install successor leaf",
+            ));
+        }
+        predecessor.remove_from(self)?;
+        Ok(ProductSignerHandover {
+            commit: commit.to_bytes().map_err(mls)?,
+            successor,
         })
     }
 
@@ -1035,6 +1109,179 @@ mod tests {
         let removed = group.commit_removes_own_leaf(&staged);
         assert_eq!(provider.export_state().unwrap(), before);
         removed
+    }
+
+    #[test]
+    fn local_signer_handover_is_detached_restartable_and_exact() {
+        let provider = Provider::new();
+        let predecessor = SigningIdentity::generate(&provider).unwrap();
+        let peer_provider = Provider::new();
+        let peer_signer = SigningIdentity::generate(&peer_provider).unwrap();
+        let profile = ProductProfileHooks::new(
+            Capabilities::default(),
+            Extensions::default(),
+            Extensions::default(),
+            ProductJoinLimits::new(4, 4, 32).unwrap(),
+        )
+        .unwrap();
+        let group_id = b"signer-handover";
+        let mut group = provider
+            .create_product_group(&predecessor, group_id, credential(&predecessor), &profile)
+            .unwrap();
+        let peer_package = peer_provider
+            .product_key_package(
+                &peer_signer,
+                credential(&peer_signer),
+                Capabilities::default(),
+                Extensions::default(),
+            )
+            .unwrap();
+        let add = provider
+            .prepare_product_commit(
+                &mut group,
+                &predecessor,
+                ProductCommitRequest {
+                    additions: vec![peer_package],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let welcome = MlsMessageIn::tls_deserialize_exact(add.welcome.unwrap()).unwrap();
+        let MlsMessageBodyIn::Welcome(welcome) = welcome.extract() else {
+            panic!("Welcome absent")
+        };
+        let staged_peer = peer_provider
+            .stage_product_welcome(&ProductJoinLimits::new(4, 4, 32).unwrap(), welcome)
+            .unwrap();
+        let mut peer = peer_provider.install_product_welcome(staged_peer).unwrap();
+        provider.merge_product_pending(&mut group).unwrap();
+
+        let source_before = provider.export_state().unwrap();
+        let selected = provider.detached().unwrap();
+        let mut selected_group = selected.load_product_group(group_id).unwrap().unwrap();
+        let successor = SigningIdentity::generate(&selected).unwrap();
+        let successor_state = successor.export_state();
+        let predecessor_key = predecessor.to_public_vec();
+        let successor_key = successor.to_public_vec();
+        selected
+            .set_product_aad(&mut selected_group, b"authorized signer handover".to_vec())
+            .unwrap();
+        let handover = selected
+            .prepare_product_signer_handover(
+                &mut selected_group,
+                &predecessor,
+                successor,
+                CredentialWithKey {
+                    credential: BasicCredential::new(b"successor evidence".to_vec()).into(),
+                    signature_key: successor_key.clone().into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(provider.export_state().unwrap(), source_before);
+        assert_eq!(handover.successor.public(), successor_key);
+        assert!(
+            SignatureKeyPair::read(
+                selected.storage(),
+                &predecessor_key,
+                SignatureScheme::ED25519
+            )
+            .is_none()
+        );
+        assert!(
+            SignatureKeyPair::read(selected.storage(), &successor_key, SignatureScheme::ED25519)
+                .is_some()
+        );
+        let local = selected_group
+            .members()
+            .find(|member| member.index == selected_group.own_leaf_index())
+            .unwrap();
+        assert_eq!(local.signature_key.as_slice(), successor_key);
+        assert_eq!(selected_group.epoch().as_u64(), 2);
+
+        let restarted_provider = Provider::from_state(&selected.export_state().unwrap()).unwrap();
+        let restarted_signer =
+            SigningIdentity::from_state(&restarted_provider, &successor_state).unwrap();
+        let mut restarted_group = restarted_provider
+            .load_product_group(group_id)
+            .unwrap()
+            .unwrap();
+        restarted_provider
+            .seal_product_application(&mut restarted_group, &restarted_signer, b"after restart")
+            .unwrap();
+
+        let processed = peer_provider
+            .process_product_message::<GroupError>(
+                &mut peer,
+                &handover.commit,
+                ProductMessageMode::Member,
+                |_, _| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(processed.aad(), b"authorized signer handover");
+        let ProcessedMessageContent::StagedCommitMessage(staged) = processed.into_content() else {
+            panic!("handover commit absent")
+        };
+        peer_provider
+            .merge_product_commit(&mut peer, *staged)
+            .unwrap();
+        assert_eq!(peer.epoch().as_u64(), 2);
+        assert_eq!(
+            peer.members()
+                .find(|member| member.index == selected_group.own_leaf_index())
+                .unwrap()
+                .signature_key
+                .as_slice(),
+            successor_key
+        );
+    }
+
+    #[test]
+    fn local_signer_handover_rejects_substitution_without_live_effects() {
+        let provider = Provider::new();
+        let predecessor = SigningIdentity::generate(&provider).unwrap();
+        let profile = ProductProfileHooks::new(
+            Capabilities::default(),
+            Extensions::default(),
+            Extensions::default(),
+            ProductJoinLimits::new(4, 4, 32).unwrap(),
+        )
+        .unwrap();
+        let group_id = b"signer-handover-attacks";
+        provider
+            .create_product_group(&predecessor, group_id, credential(&predecessor), &profile)
+            .unwrap();
+        let source_before = provider.export_state().unwrap();
+
+        let same = provider.detached().unwrap();
+        let mut same_group = same.load_product_group(group_id).unwrap().unwrap();
+        let same_signer = SigningIdentity::from_state(&same, &predecessor.export_state()).unwrap();
+        assert!(
+            same.prepare_product_signer_handover(
+                &mut same_group,
+                &predecessor,
+                same_signer,
+                credential(&predecessor)
+            )
+            .is_err()
+        );
+
+        let changed = provider.detached().unwrap();
+        let mut changed_group = changed.load_product_group(group_id).unwrap().unwrap();
+        let successor = SigningIdentity::generate(&changed).unwrap();
+        assert!(
+            changed
+                .prepare_product_signer_handover(
+                    &mut changed_group,
+                    &predecessor,
+                    successor,
+                    credential(&predecessor)
+                )
+                .is_err()
+        );
+        let mut malformed = predecessor.export_state();
+        malformed[0] ^= 1;
+        assert!(SigningIdentity::from_state(&provider, &malformed).is_err());
+        assert_eq!(provider.export_state().unwrap(), source_before);
     }
 
     #[test]

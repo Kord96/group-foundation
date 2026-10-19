@@ -47,6 +47,8 @@ validation and an atomic host transaction.
 | `stageProcess(groupId, frame, mode)` | Authenticated message facts and detached candidate |
 | `stageSeal(groupId, plaintext, aad)` | Application frame and advanced detached send ratchet |
 | `stageSelfRemove(groupId, aad)` | SelfRemove proposal frame and detached custody |
+| `prepareSignerHandover()` | Fresh opaque successor signing state and its public key; source custody is unchanged |
+| `stageSignerHandover(groupId, successorSigningState, credential, aad)` | Detached MLS self-update and successor-only custody for an atomic host handover |
 | `stageDelete(groupId)` | Custody removing only the selected installed group's complete native namespace |
 | `stageRecords(records)` | Custody containing opaque sidecar writes or removals |
 | `stageCheckpoint(anchor, selected, groupId, sidecarKeys)` | Candidate replacing only one group's native namespace and the exact named sidecars |
@@ -55,6 +57,16 @@ validation and an atomic host transaction.
 opaque dictionary updates by component ID, and optional exact TLS proposal
 references. An absent reference list includes all pending proposals; an empty
 list selects none. Duplicate and absent selected references are rejected.
+
+Local signer handover is a distinct custody operation, not a generic membership
+change. The host first durably retains the opaque successor signing state and
+authorizes its exact public key. Staging then uses the predecessor key for the
+MLS Commit envelope and the successor key for the updated leaf and GroupInfo.
+The returned custody retains the same local leaf and all unrelated provider
+state, contains only the successor local signer, and leaves source custody
+unchanged. The host must atomically install that custody with its product-owned
+signer/configuration binding and exact outbox Commit. Foundation does not write
+configuration or infer product authority.
 
 Message mode `member` accepts MLS proposals, commits, or applications.
 `application` rejects handshakes before processing. `ownCommit` authenticates an

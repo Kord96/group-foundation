@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add a detached native MLS signer-handover primitive. It prepares an opaque
+  successor key, stages the predecessor-authenticated self-update, returns
+  successor-only custody, and leaves product policy plus atomic configuration
+  installation with the consuming host.
+
 ## 0.3.0
 
 - Add the standalone `@group-foundation/admission-guard` package for canonical
