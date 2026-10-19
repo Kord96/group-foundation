@@ -1,6 +1,6 @@
 {
-  "name": "@group-foundation/admission-guard",
-  "version": "0.3.0",
+  "name": "@group-foundation/bouncer",
+  "version": "0.4.0",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "files": [
@@ -24,9 +24,9 @@
       "types": "./dist/policy.d.ts",
       "import": "./dist/policy.js"
     },
-    "./guard": {
-      "types": "./dist/guard.d.ts",
-      "import": "./dist/guard.js"
+    "./bouncer": {
+      "types": "./dist/bouncer.d.ts",
+      "import": "./dist/bouncer.js"
     }
   },
   "scripts": {

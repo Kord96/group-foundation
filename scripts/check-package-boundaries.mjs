@@ -28,4 +28,4 @@ for (const name of packageNames) {
     visit(source);
   }
 }
-console.log('Package DAG and production imports passed: core → admission → HyperKey; testing remains separate.');
+console.log('Package DAG and production imports passed: Bouncer is standalone; core → admission → HyperKey; testing remains separate.');

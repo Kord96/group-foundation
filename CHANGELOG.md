@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+- Replace `@group-foundation/admission-guard` with the clean-break
+  `@group-foundation/bouncer` package. Bouncer emits immutable, digest-bound
+  approved or denied decisions and never executes membership, UsersDB, AppsDB,
+  storage or follow-up actions. No predecessor export or package alias remains.
+- Qualify the rename and native signer handover as the version-aligned `0.4.0`
+  Foundation closure.
 
 - Add a detached native MLS signer-handover primitive. It prepares an opaque
   successor key, stages the predecessor-authenticated self-update, returns
@@ -9,7 +16,7 @@
 
 ## 0.3.0
 
-- Add the standalone `@group-foundation/admission-guard` package for canonical
+- Add the standalone `@group-foundation/bouncer` package for canonical
   claim policies, request-bound signed evidence, and exact disclosure checks.
   It has no runtime dependencies and is independent of group admission.
 - Qualify all four npm packages and the Rust crate as one version-aligned

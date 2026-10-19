@@ -1,24 +1,23 @@
-# Admission Guard
+# Bouncer
 
-`@group-foundation/admission-guard` is a standalone policy and signed-evidence
+`@group-foundation/bouncer` is a standalone policy and signed-evidence
 boundary. It has no runtime dependencies, imports no product packages, and is
 independent of `@group-foundation/group-admission`. It creates canonical,
 short-lived requests and evaluates the exact requested claim disclosure through
 host cryptographic verification ports.
 
-The first release is `0.3.0`. Pin `@group-foundation/admission-guard@0.3.0`
-exactly; the immutable three-package `0.2.0` Foundation closure does not include
-this package.
+The clean-break release is `0.4.0`. Pin `@group-foundation/bouncer@0.4.0`
+exactly. The predecessor package is absent from this release and has no alias.
 
-Exports: the root combines `/contracts`, `/wire`, `/policy`, and `/guard`.
-All policy and guard operations that hash data are asynchronous. Supply SHA-256
+Exports: the root combines `/contracts`, `/wire`, `/policy`, and `/bouncer`.
+All policy and Bouncer operations that hash data are asynchronous. Supply SHA-256
 as a port; production code uses `Uint8Array`, `TextEncoder`, and plain JavaScript.
 
 ```ts
 import {
-  defineClaimPolicyV1, verifyAdmissionSignedEvidenceV1,
+  defineClaimPolicyV1, verifyBouncerSignedEvidenceV1,
   type Sha256Port,
-} from '@group-foundation/admission-guard';
+} from '@group-foundation/bouncer';
 
 const sha256: Sha256Port = {
   sha256: async bytes => new Uint8Array(
@@ -40,13 +39,13 @@ const policy = await defineClaimPolicyV1({
 
 // The host supplies its exact expected scope, canonical policy pin,
 // independently generated 32-byte nonce, and opaque 32-byte subject commitment.
-const result = await verifyAdmissionSignedEvidenceV1({
+const result = await verifyBouncerSignedEvidenceV1({
   policy, binding: expectedBinding,
   claims: [{ claimId: 'qualification', disclosure: policy.claims[0]!.disclosure }],
   presentation: signedPresentation, evidence: signedClaims, now,
   verifier: hostVerifier,
 }, sha256);
-// Atomically consume result.request.requestId with the host's durable effect.
+// result.decision is approved or denied. The caller separately owns any effect.
 ```
 
 `scopeId`, target, recipient, audience, purpose, policy ID/revision/digest, subject
@@ -59,28 +58,28 @@ unpredictability, and cryptographic scope binding.
 
 Times are nonnegative safe-integer Unix seconds. Deadlines are exclusive.
 Requests last at most 900 seconds, and signed-presentation lifetime bounds their
-window. Evaluation freshness is capped by the request, evidence lifetime,
+window. Approved-decision freshness is capped by the request, evidence lifetime,
 verification expiry, and policy maximum verification age.
 
 The host's presentation verifier authenticates the subject, signed lifetime and
 **every expected binding field**. Its evidence verifier authenticates each signed
 claim, predicate, subject, exact request ID/binding, issuer, method and timestamps
 before projecting to `ClaimEvidenceV1`. Adapter failures become one opaque
-`AdmissionGuardError`. Evidence adapters may be synchronous or asynchronous.
-The guard verifies presentation before claims and refuses extra, missing,
-duplicate, unauthorized, stale or overdisclosed evidence.
+`BouncerError`. Evidence adapters may be synchronous or asynchronous.
+Bouncer verifies presentation before claims. Structurally valid insufficient,
+expired or untrusted evidence returns an immutable denied decision. Malformed
+input and verifier failure throw an explicit error.
 
-`evaluateAdmissionEvidenceV1` is a lower-level operation for already authenticated
-and request-bound evidence. It requires an independent expected `binding`, as do
-request/evaluation assertions. Wire parsers perform closed structural decoding;
-request integrity verification only checks a digest. Neither establishes
-cryptographic authenticity. An evaluation read from an untrusted channel must be
-authenticated by the host before assertion; it is not a bearer credential.
+`evaluateBouncerEvidenceV1` is a lower-level operation for already authenticated
+and request-bound evidence. It requires an independent expected `binding`.
+`assertBouncerDecisionV1` rechecks an immutable decision's request, policy,
+evidence digest and freshness. Wire parsing and digest integrity do not establish
+cryptographic authenticity or create a bearer permit.
 
-The package owns no membership decision, durable replay ledger, subject key,
-issuer trust store, policy store, storage or network. The host must load its
-current policy, fence revocation/currentness through its physical commit, and
-atomically consume the exact request ID with any durable admission effect.
+The package owns no membership, registry or application action, durable replay
+ledger, subject key, issuer trust store, policy store, storage or network. The
+host must load its current policy, fence revocation/currentness through its
+physical commit, and atomically consume the exact request ID with its own effect.
 `createClaimPolicyPinV1` rejects in-process rollback and same-revision forks;
 restart safety and current policy selection remain host responsibilities.
 

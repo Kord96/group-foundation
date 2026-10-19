@@ -16,6 +16,9 @@ a transport, database, identity service, profile, or UI.
   installation receipts, plus signed bootstrap presentation and local handoff
   state. Candidate verification and authorization are injected through ports;
   QR rendering, cameras, transports, and product policy remain consumers.
+- `@group-foundation/bouncer` owns portable claim policy, evidence requests,
+  verifier orchestration, and immutable approved or denied decisions. Callers
+  retain replay, currentness, persistence, membership and registry actions.
 - `@group-foundation/hyperkey` owns a logical conventional Ed25519 key, its
   immutable descriptor, independently admitted Copies, private seed delivery,
   and Copy workflow. It depends only on the two Foundation packages.
@@ -35,6 +38,7 @@ opens a persistence writer of its own.
 ```text
 group-core <- group-admission
 group-core <- hyperkey -> group-admission
+bouncer
 ```
 
 Zagel and future consumers depend downward on these packages. Foundation never
@@ -48,8 +52,8 @@ imports a consumer package. HyperKey is not a Zagel runtime dependency.
   `hyperkey.*`; preview data is reset and predecessor values are rejected.
 - Consumers pin one immutable, version-aligned Foundation release closure. The
   initial closure was `0.1.0`; the admission-bootstrap v2 clean break is `0.2.0`.
-  The standalone admission guard joins the closure at `0.3.0`; the immutable
-  `0.2.0` closure remains unchanged.
+  Bouncer replaces the standalone evaluator without aliases in `0.4.0`; older
+  immutable closures remain unchanged.
 - The current MLS/OpenMLS/toolchain versions are preserved until a separately
   reviewed compatibility migration.
 - The current Zagel BFU remains in Zagel.

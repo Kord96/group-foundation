@@ -96,22 +96,23 @@ export async function assertClaimReleaseConsentV1(policy: ClaimPolicyV1, binding
   });
 }
 
-function assertEvidence(current: ClaimPolicyV1, evidence: readonly ClaimEvidenceV1[], now: number, complete: boolean): void {
-  if (!wireInteger(now)) return fail();
+/** Pure requirement check for inputs already decoded and pinned by Bouncer. */
+export function claimEvidenceSatisfiesV1(current: ClaimPolicyV1, evidence: readonly ClaimEvidenceV1[], now: number, complete = true): boolean {
+  if (!wireInteger(now)) return false;
   const seen = new Set<string>();
   for (const item of evidence) {
     const rule = current.claims.find(claim => claim.claimId === item.claimId);
-    if (!rule || seen.has(item.claimId)) return fail();
+    if (!rule || seen.has(item.claimId)) return false;
     seen.add(item.claimId);
     if (item.verificationExpiresAt <= item.verifiedAt || item.expiresAt > item.verificationExpiresAt
       || item.verifiedAt > item.issuedAt || item.issuedAt > now || item.expiresAt <= now || item.expiresAt <= item.issuedAt
       || now - item.verifiedAt >= rule.verification.maximumAgeSeconds || !rule.verification.methods.includes(item.verificationMethod)
-      || rule.predicate.kind === 'issuer-claim' && item.verificationIssuer !== rule.predicate.issuer) return fail();
+      || rule.predicate.kind === 'issuer-claim' && item.verificationIssuer !== rule.predicate.issuer) return false;
     if (Object.hasOwn(item, 'assertion') && !rule.disclosure.assertion
       || Object.hasOwn(item, 'value') && !rule.disclosure.rawValue
-      || Object.hasOwn(item, 'privateIdentifier') && !rule.disclosure.scopedIdentifier) return fail();
+      || Object.hasOwn(item, 'privateIdentifier') && !rule.disclosure.scopedIdentifier) return false;
   }
-  if (complete && current.claims.some(claim => claim.required && !seen.has(claim.claimId))) return fail();
+  return !(complete && current.claims.some(claim => claim.required && !seen.has(claim.claimId)));
 }
 
 /** Evidence must already be authenticated and bound to this exact request by the host. */
@@ -119,7 +120,7 @@ export async function evaluateClaimEvidenceV1(policy: ClaimPolicyV1, binding: Ev
   return guarded(async () => {
     const items = wireArray(evidence).map(parseClaimEvidenceV1);
     const current = await assertEvidenceRequestBindingV1(policy, binding, sha256);
-    assertEvidence(current, items, now, true);
+    if (!claimEvidenceSatisfiesV1(current, items, now)) return fail();
   });
 }
 
@@ -127,6 +128,6 @@ export async function assertClaimEvidenceItemV1(policy: ClaimPolicyV1, binding: 
   return guarded(async () => {
     const item = parseClaimEvidenceV1(evidence);
     const current = await assertEvidenceRequestBindingV1(policy, binding, sha256);
-    assertEvidence(current, [item], now, false);
+    if (!claimEvidenceSatisfiesV1(current, [item], now, false)) return fail();
   });
 }
