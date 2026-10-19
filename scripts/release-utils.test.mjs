@@ -20,7 +20,7 @@ test('release closure requires one exact npm and Rust crate version', () => {
   const manifests = {
     'group-core': core,
     'group-admission': { version: '0.1.0' },
-    'admission-guard': { version: '0.1.0' },
+    'bouncer': { version: '0.1.0' },
     hyperkey: { version: '0.1.0' },
   };
   assert.equal(validateReleaseVersions(manifests, '[package]\nversion = "0.1.0"\n'), '0.1.0');

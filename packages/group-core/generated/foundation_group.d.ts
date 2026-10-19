@@ -23,6 +23,8 @@ export interface ProductKeyPackageStage { custody: Uint8Array; keyPackage: Uint8
 export interface ProductComponentUpdate { id: number; value: Uint8Array | null; }
 export interface ProductCommitRequest { additions: Uint8Array[]; removals: number[]; componentUpdates: ProductComponentUpdate[]; proposalReferences?: Uint8Array[]; }
 export interface ProductCommitStage extends ProductStage { commit: Uint8Array; welcome?: Uint8Array; pendingCustody: Uint8Array; }
+export interface ProductSignerHandoverCandidate { signingState: Uint8Array; signingKey: Uint8Array; }
+export interface ProductSignerHandoverStage extends ProductStage { commit: Uint8Array; predecessorSigningKey: Uint8Array; successorSigningKey: Uint8Array; }
 export interface ProductMessageStage extends ProductStage { kind: 'commit' | 'proposal' | 'application'; sender: Uint8Array; credential: Uint8Array; aad: Uint8Array; messageEpoch: string; componentUpdates: ProductComponentUpdate[]; proposals: ProductProposal[]; plaintext?: Uint8Array; resultingContext?: Uint8Array; selfRemoved?: boolean; }
 export interface ProductFrameStage extends ProductStage { frame: Uint8Array; }
 export interface ProductRecord { key: Uint8Array; value: Uint8Array | null; }
@@ -95,6 +97,12 @@ export class NativeProductClient {
     inspect(group_id: Uint8Array): ProductProjection;
     constructor();
     ownSigner(): Uint8Array;
+    /**
+     * Generate an independent successor signer without changing this custody.
+     * The opaque signing state must be durably retained by the host while the
+     * product authorizes the exact public successor key.
+     */
+    prepareSignerHandover(): ProductSignerHandoverCandidate;
     readRecord(key: Uint8Array): Uint8Array | undefined;
     signProof(transcript: Uint8Array): ProductSignerProof;
     /**
@@ -130,6 +138,12 @@ export class NativeProductClient {
     stageRecords(records: ProductRecord[]): Uint8Array;
     stageSeal(group_id: Uint8Array, plaintext: Uint8Array, aad: Uint8Array): ProductFrameStage;
     stageSelfRemove(group_id: Uint8Array, aad: Uint8Array): ProductFrameStage;
+    /**
+     * Produce one self-update that replaces this client's active local MLS
+     * signer. The source is unchanged. The result contains only successor
+     * custody; the predecessor signer is deleted from its provider state.
+     */
+    stageSignerHandover(group_id: Uint8Array, successor_signing_state: Uint8Array, credential: Uint8Array, aad: Uint8Array): ProductSignerHandoverStage;
 }
 
 export function member_fingerprint(signing_key: Uint8Array): Uint8Array;
@@ -138,30 +152,6 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly __wbg_nativeproductclient_free: (a: number, b: number) => void;
-    readonly nativeproductclient_exportCustody: (a: number) => [number, number, number, number];
-    readonly nativeproductclient_exportProviderState: (a: number) => [number, number, number, number];
-    readonly nativeproductclient_exportSecret: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
-    readonly nativeproductclient_exportSigningState: (a: number) => [number, number];
-    readonly nativeproductclient_fromCustody: (a: number, b: number) => [number, number, number];
-    readonly nativeproductclient_fromParts: (a: number, b: number, c: number, d: number) => [number, number, number];
-    readonly nativeproductclient_hasGroup: (a: number, b: number, c: number) => [number, number, number];
-    readonly nativeproductclient_inspect: (a: number, b: number, c: number) => [number, number, number];
-    readonly nativeproductclient_new: () => [number, number, number];
-    readonly nativeproductclient_ownSigner: (a: number) => [number, number];
-    readonly nativeproductclient_readRecord: (a: number, b: number, c: number) => [number, number, number, number];
-    readonly nativeproductclient_signProof: (a: number, b: number, c: number) => [number, number, number];
-    readonly nativeproductclient_stageCheckpoint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => [number, number, number, number];
-    readonly nativeproductclient_stageCommit: (a: number, b: number, c: number, d: any, e: number, f: number) => [number, number, number];
-    readonly nativeproductclient_stageCreate: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number, number];
-    readonly nativeproductclient_stageDelete: (a: number, b: number, c: number) => [number, number, number, number];
-    readonly nativeproductclient_stageJoin: (a: number, b: number, c: number, d: any) => [number, number, number];
-    readonly nativeproductclient_stageKeyPackage: (a: number, b: number, c: number, d: any) => [number, number, number];
-    readonly nativeproductclient_stageMergePending: (a: number, b: number, c: number) => [number, number, number];
-    readonly nativeproductclient_stageProcess: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
-    readonly nativeproductclient_stageRecords: (a: number, b: any) => [number, number, number, number];
-    readonly nativeproductclient_stageSeal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
-    readonly nativeproductclient_stageSelfRemove: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly __wbg_nativeauthorityfacts_free: (a: number, b: number) => void;
     readonly __wbg_nativeclient_free: (a: number, b: number) => void;
     readonly member_fingerprint: (a: number, b: number) => [number, number, number, number];
@@ -179,6 +169,32 @@ export interface InitOutput {
     readonly nativeclient_stageOpenApplication: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
     readonly nativeclient_stageRemove: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint) => [number, number, number];
     readonly nativeclient_stageSealApplication: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint) => [number, number, number];
+    readonly __wbg_nativeproductclient_free: (a: number, b: number) => void;
+    readonly nativeproductclient_exportCustody: (a: number) => [number, number, number, number];
+    readonly nativeproductclient_exportProviderState: (a: number) => [number, number, number, number];
+    readonly nativeproductclient_exportSecret: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
+    readonly nativeproductclient_exportSigningState: (a: number) => [number, number];
+    readonly nativeproductclient_fromCustody: (a: number, b: number) => [number, number, number];
+    readonly nativeproductclient_fromParts: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly nativeproductclient_hasGroup: (a: number, b: number, c: number) => [number, number, number];
+    readonly nativeproductclient_inspect: (a: number, b: number, c: number) => [number, number, number];
+    readonly nativeproductclient_new: () => [number, number, number];
+    readonly nativeproductclient_ownSigner: (a: number) => [number, number];
+    readonly nativeproductclient_prepareSignerHandover: (a: number) => [number, number, number];
+    readonly nativeproductclient_readRecord: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly nativeproductclient_signProof: (a: number, b: number, c: number) => [number, number, number];
+    readonly nativeproductclient_stageCheckpoint: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: any) => [number, number, number, number];
+    readonly nativeproductclient_stageCommit: (a: number, b: number, c: number, d: any, e: number, f: number) => [number, number, number];
+    readonly nativeproductclient_stageCreate: (a: number, b: number, c: number, d: number, e: number, f: any) => [number, number, number];
+    readonly nativeproductclient_stageDelete: (a: number, b: number, c: number) => [number, number, number, number];
+    readonly nativeproductclient_stageJoin: (a: number, b: number, c: number, d: any) => [number, number, number];
+    readonly nativeproductclient_stageKeyPackage: (a: number, b: number, c: number, d: any) => [number, number, number];
+    readonly nativeproductclient_stageMergePending: (a: number, b: number, c: number) => [number, number, number];
+    readonly nativeproductclient_stageProcess: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly nativeproductclient_stageRecords: (a: number, b: any) => [number, number, number, number];
+    readonly nativeproductclient_stageSeal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+    readonly nativeproductclient_stageSelfRemove: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly nativeproductclient_stageSignerHandover: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;

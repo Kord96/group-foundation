@@ -20,7 +20,7 @@ package DAG and production import checks, a clean TypeScript build followed by
 checks/tests, locked
 Rust tests with all features, core Chromium tests, and the HyperKey browser
 example. The dependency check requires core to have no production dependencies,
-admission to depend on core, admission guard to have no production dependencies,
+admission to depend on core, Bouncer to have no production dependencies,
 and HyperKey to depend on core and admission. It
 parses TypeScript imports, including type imports and dynamic imports, to reject
 undeclared dependencies, relative package escapes, and production imports of
@@ -72,23 +72,23 @@ qualification report is required before publishing. Retain the qualified
 archives and their SHA-256 hashes, and publish those exact npm archives rather
 than rebuilding them. The version-aligned npm closure contains
 `@group-foundation/group-core`, `@group-foundation/group-admission`,
-`@group-foundation/admission-guard`, and `@group-foundation/hyperkey`; the Rust
+`@group-foundation/bouncer`, and `@group-foundation/hyperkey`; the Rust
 crate is `group-foundation-core`.
 
 The publisher needs npm authentication with permission to publish the
 `@group-foundation` scope, and Cargo authentication/ownership for the Rust crate.
 The scoped npm packages require public access (`npm publish <qualified.tgz>
 --access public`). Publish core before admission, and both before HyperKey;
-admission guard has no dependency ordering requirement. Confirm the exact
+Bouncer has no dependency ordering requirement. Confirm the exact
 versions are available in the registry before handing consumers the release.
 
-Consumers of the new standalone guard must pin
-`@group-foundation/admission-guard@0.3.0` exactly. A source checkout or local
+Consumers of Bouncer must pin
+`@group-foundation/bouncer@0.4.0` exactly. A source checkout or local
 tarball does not establish that this registry release is available.
 
 An archive-based consumer may instead retain the exact qualified npm archives
 with their report hashes and the immutable Foundation Git revision. Its intake
 must install those archives as packages and verify the installed versions; it
 must not substitute a mutable checkout, rename the old `0.2.0` closure, or assume
-that an npm publication occurred. The first guard release belongs to the new
-four-package `0.3.0` closure.
+that an npm publication occurred. Bouncer belongs to the version-aligned
+four-package `0.4.0` closure.

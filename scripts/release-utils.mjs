@@ -4,10 +4,10 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { posix, resolve, relative, sep } from 'node:path';
 
-export const packageNames = ['group-core', 'group-admission', 'admission-guard', 'hyperkey'];
+export const packageNames = ['group-core', 'group-admission', 'bouncer', 'hyperkey'];
 export const scope = '@group-foundation/';
 const expectedDependencies = {
-  'group-core': [], 'group-admission': ['group-core'], 'admission-guard': [], hyperkey: ['group-admission', 'group-core'],
+  'group-core': [], 'group-admission': ['group-core'], 'bouncer': [], hyperkey: ['group-admission', 'group-core'],
 };
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = async path => JSON.parse(await readFile(path, 'utf8'));

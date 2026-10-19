@@ -1,4 +1,4 @@
-/** Closed verification vocabulary, independent of owner admission decisions. */
+/** Closed verification vocabulary, independent of caller actions. */
 export type ClaimPredicateV1 = Readonly<{kind:'contact-possession';channel:'email'|'phone'}> | Readonly<{kind:'issuer-claim';issuer:string;claim:string}>;
 export interface ClaimDisclosureV1 {readonly assertion:boolean;readonly rawValue:boolean;readonly scopedIdentifier:boolean;}
 export interface ClaimRequirementV1 {
@@ -25,21 +25,21 @@ export interface ClaimEvidenceV1 {
 
 
 /** A consumer asks for an exact policy-authorized subset of one claim. */
-export interface AdmissionClaimRequestV1 {
+export interface BouncerClaimRequestV1 {
   readonly claimId: string;
   readonly disclosure: ClaimDisclosureV1;
 }
 
 /**
- * The request is portable data. It is not an admission or membership decision,
+ * The request is portable data. It is not an action or authority decision,
  * and has no storage, session, application, or identity-provider authority.
  */
-export interface AdmissionEvidenceRequestDefinitionV1 {
-  readonly schema: 'group-foundation.admission-evidence-request.v1';
+export interface BouncerEvidenceRequestDefinitionV1 {
+  readonly schema: 'group-foundation.bouncer-evidence-request.v1';
   readonly binding: EvidenceRequestBindingV1;
   readonly issuedAt: number;
   readonly expiresAt: number;
-  readonly claims: readonly AdmissionClaimRequestV1[];
+  readonly claims: readonly BouncerClaimRequestV1[];
 }
 
 /**
@@ -48,12 +48,12 @@ export interface AdmissionEvidenceRequestDefinitionV1 {
  * nonce, freshness window, and disclosure subset. Consumers atomically retain
  * this exact value if their operation must be one-use.
  */
-export interface AdmissionEvidenceRequestV1 extends AdmissionEvidenceRequestDefinitionV1 {
+export interface BouncerEvidenceRequestV1 extends BouncerEvidenceRequestDefinitionV1 {
   readonly requestId: string;
 }
 
 /** Only fields explicitly requested and allowed by the current policy appear. */
-export interface AdmissionClaimDisclosureV1 {
+export interface BouncerClaimDisclosureV1 {
   readonly claimId: string;
   readonly assertion?: true;
   readonly value?: string;
@@ -61,68 +61,84 @@ export interface AdmissionClaimDisclosureV1 {
 }
 
 /**
- * A successful evidence evaluation. This proves only that supplied evidence
- * satisfies a portable request at `evaluatedAt`; the caller owns durable
- * replay consumption and any user/app/group/session decision.
+ * A decision binds the exact policy, request and supplied evidence without
+ * carrying an action continuation. Only approved decisions carry disclosure
+ * and freshness data. The caller owns replay consumption and every effect.
  */
-export interface AdmissionEvidenceEvaluationV1 {
-  readonly schema: 'group-foundation.admission-evidence-evaluation.v1';
+export interface BouncerDecisionBaseV1 {
+  readonly schema: 'group-foundation.bouncer-decision.v1';
+  readonly decisionId: string;
   readonly requestId: string;
   readonly binding: EvidenceRequestBindingV1;
+  readonly policyId: string;
+  readonly policyRevision: number;
+  readonly policyDigest: string;
+  readonly evidenceDigest: string;
   readonly requestIssuedAt: number;
   readonly requestExpiresAt: number;
   readonly evaluatedAt: number;
-  readonly evidenceFreshUntil: number;
-  readonly disclosures: readonly AdmissionClaimDisclosureV1[];
 }
 
-export type AdmissionEvidenceInputV1 = ClaimEvidenceV1;
+export interface BouncerApprovedDecisionV1 extends BouncerDecisionBaseV1 {
+  readonly outcome: 'approved';
+  readonly evidenceFreshUntil: number;
+  readonly disclosures: readonly BouncerClaimDisclosureV1[];
+}
+
+export interface BouncerDeniedDecisionV1 extends BouncerDecisionBaseV1 {
+  readonly outcome: 'denied';
+  readonly reason: 'evidence-requirements-not-satisfied';
+}
+
+export type BouncerDecisionV1 = BouncerApprovedDecisionV1 | BouncerDeniedDecisionV1;
+
+export type BouncerEvidenceInputV1 = ClaimEvidenceV1;
 
 
 /**
- * A consumer adapter's cryptographically verified presentation. The Guard
+ * A consumer adapter's cryptographically verified presentation. Bouncer
  * uses its signed lifetime to bound the evidence request; `value` remains
  * opaque so the consumer can retain the presentation owner's currentness
  * fence around its own durable effect.
  */
-export interface AdmissionVerifiedPresentationV1<T> {
+export interface BouncerVerifiedPresentationV1<T> {
   readonly issuedAt: number;
   readonly expiresAt: number;
   readonly value: T;
 }
 
 /** A signed evidence item projected to the portable ClaimPolicy vocabulary. */
-export interface AdmissionVerifiedEvidenceV1<T> {
-  readonly evidence: AdmissionEvidenceInputV1;
+export interface BouncerVerifiedEvidenceV1<T> {
+  readonly evidence: BouncerEvidenceInputV1;
   readonly value: T;
 }
 
 /**
- * Product-specific cryptography stays behind these ports. Admission Guard
+ * Product-specific cryptography stays behind these ports. Bouncer
  * owns their ordering and supplies the exact expected binding to both.
  */
-export interface AdmissionSignedEvidenceVerifierV1<TPresentation, TEvidence> {
-  verifyPresentation(presentation: unknown, binding: EvidenceRequestBindingV1): Promise<AdmissionVerifiedPresentationV1<TPresentation>>;
+export interface BouncerSignedEvidenceVerifierV1<TPresentation, TEvidence> {
+  verifyPresentation(presentation: unknown, binding: EvidenceRequestBindingV1): Promise<BouncerVerifiedPresentationV1<TPresentation>>;
   verifyEvidence(evidence: unknown, input: Readonly<{
-    request: AdmissionEvidenceRequestV1;
+    request: BouncerEvidenceRequestV1;
     policy: ClaimPolicyV1;
     now: number;
-  }>): AdmissionVerifiedEvidenceV1<TEvidence> | Promise<AdmissionVerifiedEvidenceV1<TEvidence>>;
+  }>): BouncerVerifiedEvidenceV1<TEvidence> | Promise<BouncerVerifiedEvidenceV1<TEvidence>>;
 }
 
-/** A verified presentation and complete signed evidence evaluation. */
-export interface AdmissionSignedEvidenceEvaluationV1<TPresentation, TEvidence> {
-  readonly request: AdmissionEvidenceRequestV1;
-  readonly evaluation: AdmissionEvidenceEvaluationV1;
+/** Verified inputs and the resulting immutable decision. */
+export interface BouncerSignedEvidenceDecisionV1<TPresentation, TEvidence> {
+  readonly request: BouncerEvidenceRequestV1;
+  readonly decision: BouncerDecisionV1;
   readonly presentation: TPresentation;
   readonly evidence: readonly TEvidence[];
 }
 
-/** Deliberately opaque, fail-closed refusal for malformed, stale, substituted, or insufficient evidence. */
-export class AdmissionGuardError extends Error {
+/** Explicit failure for malformed input or unavailable verification infrastructure. */
+export class BouncerError extends Error {
   constructor() {
-    super('admission-evidence-invalid');
-    this.name = 'AdmissionGuardError';
+    super('bouncer-evidence-invalid');
+    this.name = 'BouncerError';
   }
 }
 
@@ -131,8 +147,8 @@ export interface Sha256Port {
   sha256(bytes: Uint8Array): Uint8Array | Promise<Uint8Array>;
 }
 
-export class AdmissionWireError extends Error {
-  constructor() { super('admission-wire-invalid'); this.name = 'AdmissionWireError'; }
+export class BouncerWireError extends Error {
+  constructor() { super('bouncer-wire-invalid'); this.name = 'BouncerWireError'; }
 }
 
 export class ClaimPolicyError extends Error {

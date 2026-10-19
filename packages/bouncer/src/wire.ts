@@ -1,11 +1,11 @@
-import { AdmissionWireError } from './contracts.js';
+import { BouncerWireError } from './contracts.js';
 import type {
-  AdmissionClaimDisclosureV1, AdmissionClaimRequestV1, AdmissionEvidenceEvaluationV1,
-  AdmissionEvidenceRequestDefinitionV1, AdmissionEvidenceRequestV1, ClaimDisclosureV1,
+  BouncerClaimDisclosureV1, BouncerClaimRequestV1, BouncerDecisionV1,
+  BouncerEvidenceRequestDefinitionV1, BouncerEvidenceRequestV1, ClaimDisclosureV1,
   ClaimEvidenceV1, EvidenceRequestBindingV1,
 } from './contracts.js';
 
-export const wireInvalid = (): never => { throw new AdmissionWireError(); };
+export const wireInvalid = (): never => { throw new BouncerWireError(); };
 export const wireText = (value: unknown): value is string => typeof value === 'string'
   && value.length > 0 && value.length <= 512 && !/[\p{Cc}\p{Cf}]/u.test(value);
 export const wireInteger = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
@@ -50,7 +50,7 @@ export function parseEvidenceRequestBindingV1(value: unknown): Readonly<Evidence
   return Object.freeze({ ...record }) as unknown as EvidenceRequestBindingV1;
 }
 
-function requestClaims(value: unknown): readonly AdmissionClaimRequestV1[] {
+function requestClaims(value: unknown): readonly BouncerClaimRequestV1[] {
   const claims = wireArray(value).map(item => {
     const record = wireRecord(item, ['claimId', 'disclosure']);
     if (!wireText(record.claimId)) return wireInvalid();
@@ -60,27 +60,27 @@ function requestClaims(value: unknown): readonly AdmissionClaimRequestV1[] {
   return Object.freeze(claims);
 }
 
-export function parseAdmissionEvidenceRequestDefinitionV1(value: unknown): Readonly<AdmissionEvidenceRequestDefinitionV1> {
+export function parseBouncerEvidenceRequestDefinitionV1(value: unknown): Readonly<BouncerEvidenceRequestDefinitionV1> {
   const record = wireRecord(value, ['schema', 'binding', 'issuedAt', 'expiresAt', 'claims']);
-  if (record.schema !== 'group-foundation.admission-evidence-request.v1' || !wireInteger(record.issuedAt)
+  if (record.schema !== 'group-foundation.bouncer-evidence-request.v1' || !wireInteger(record.issuedAt)
     || !wireInteger(record.expiresAt) || record.expiresAt <= record.issuedAt || record.expiresAt - record.issuedAt > 900) return wireInvalid();
   return Object.freeze({ schema: record.schema, binding: parseEvidenceRequestBindingV1(record.binding), issuedAt: record.issuedAt, expiresAt: record.expiresAt, claims: requestClaims(record.claims) });
 }
 
 /** Structural decoding only: this does not verify the claimed digest or policy. */
-export function parseAdmissionEvidenceRequestV1(value: unknown): Readonly<AdmissionEvidenceRequestV1> {
+export function parseBouncerEvidenceRequestV1(value: unknown): Readonly<BouncerEvidenceRequestV1> {
   const record = wireRecord(value, ['schema', 'binding', 'issuedAt', 'expiresAt', 'claims', 'requestId']);
-  const request = parseAdmissionEvidenceRequestDefinitionV1({ schema: record.schema, binding: record.binding, issuedAt: record.issuedAt, expiresAt: record.expiresAt, claims: record.claims });
+  const request = parseBouncerEvidenceRequestDefinitionV1({ schema: record.schema, binding: record.binding, issuedAt: record.issuedAt, expiresAt: record.expiresAt, claims: record.claims });
   if (!wireDigest(record.requestId)) return wireInvalid();
   return Object.freeze({ ...request, requestId: record.requestId });
 }
 
-function parseOutputDisclosure(value: unknown): Readonly<AdmissionClaimDisclosureV1> {
+function parseOutputDisclosure(value: unknown): Readonly<BouncerClaimDisclosureV1> {
   const record = wireRecord(value, ['claimId'], ['assertion', 'value', 'privateIdentifier']);
   if (!wireText(record.claimId) || Object.hasOwn(record, 'assertion') && record.assertion !== true
     || Object.hasOwn(record, 'value') && !wireText(record.value)
     || Object.hasOwn(record, 'privateIdentifier') && !wirePrivateIdentifier(record.privateIdentifier)) return wireInvalid();
-  return Object.freeze({ ...record }) as unknown as AdmissionClaimDisclosureV1;
+  return Object.freeze({ ...record }) as unknown as BouncerClaimDisclosureV1;
 }
 
 export function parseClaimEvidenceV1(value: unknown): Readonly<ClaimEvidenceV1> {
@@ -94,15 +94,30 @@ export function parseClaimEvidenceV1(value: unknown): Readonly<ClaimEvidenceV1> 
   return Object.freeze({ ...record, ...disclosure }) as unknown as ClaimEvidenceV1;
 }
 
-/** A decoded evaluation is data, not proof of cryptographic verification or durable admission. */
-export function parseAdmissionEvidenceEvaluationV1(value: unknown): Readonly<AdmissionEvidenceEvaluationV1> {
-  const record = wireRecord(value, ['schema', 'requestId', 'binding', 'requestIssuedAt', 'requestExpiresAt', 'evaluatedAt', 'evidenceFreshUntil', 'disclosures']);
-  const { requestIssuedAt, requestExpiresAt, evaluatedAt, evidenceFreshUntil } = record;
-  if (record.schema !== 'group-foundation.admission-evidence-evaluation.v1' || !wireDigest(record.requestId)
-    || !wireInteger(requestIssuedAt) || !wireInteger(requestExpiresAt) || !wireInteger(evaluatedAt) || !wireInteger(evidenceFreshUntil)
-    || requestExpiresAt <= requestIssuedAt || requestExpiresAt - requestIssuedAt > 900
-    || evaluatedAt < requestIssuedAt || evaluatedAt >= requestExpiresAt || evidenceFreshUntil <= evaluatedAt || evidenceFreshUntil > requestExpiresAt) return wireInvalid();
-  const disclosures = wireArray(record.disclosures).map(parseOutputDisclosure).sort((left, right) => compareText(left.claimId, right.claimId));
+/** Structural decoding only. A decision is a fact, never an action permit. */
+export function parseBouncerDecisionV1(value: unknown): Readonly<BouncerDecisionV1> {
+  const head = wireRecord(value,
+    ['schema', 'decisionId', 'outcome', 'requestId', 'binding', 'policyId', 'policyRevision', 'policyDigest', 'evidenceDigest', 'requestIssuedAt', 'requestExpiresAt', 'evaluatedAt'],
+    ['evidenceFreshUntil', 'disclosures', 'reason']);
+  const { requestIssuedAt, requestExpiresAt, evaluatedAt } = head;
+  if (head.schema !== 'group-foundation.bouncer-decision.v1' || !wireDigest(head.decisionId)
+    || !wireDigest(head.requestId) || !wireText(head.policyId) || !wireInteger(head.policyRevision)
+    || !wireDigest(head.policyDigest) || !wireDigest(head.evidenceDigest)
+    || !wireInteger(requestIssuedAt) || !wireInteger(requestExpiresAt) || !wireInteger(evaluatedAt)
+    || requestExpiresAt <= requestIssuedAt || requestExpiresAt - requestIssuedAt > 900 || evaluatedAt < requestIssuedAt) return wireInvalid();
+  const base = { schema: head.schema, decisionId: head.decisionId, requestId: head.requestId,
+    binding: parseEvidenceRequestBindingV1(head.binding), policyId: head.policyId,
+    policyRevision: head.policyRevision, policyDigest: head.policyDigest, evidenceDigest: head.evidenceDigest,
+    requestIssuedAt, requestExpiresAt, evaluatedAt } as const;
+  if (head.outcome === 'denied') {
+    if (Reflect.ownKeys(head).some(key => key === 'evidenceFreshUntil' || key === 'disclosures')
+      || head.reason !== 'evidence-requirements-not-satisfied') return wireInvalid();
+    return Object.freeze({ ...base, outcome: head.outcome, reason: head.reason });
+  }
+  if (head.outcome !== 'approved' || Object.hasOwn(head, 'reason') || !wireInteger(head.evidenceFreshUntil)
+    || head.evidenceFreshUntil <= evaluatedAt || head.evidenceFreshUntil > requestExpiresAt
+    || evaluatedAt >= requestExpiresAt) return wireInvalid();
+  const disclosures = wireArray(head.disclosures).map(parseOutputDisclosure).sort((left, right) => compareText(left.claimId, right.claimId));
   if (new Set(disclosures.map(item => item.claimId)).size !== disclosures.length) return wireInvalid();
-  return Object.freeze({ schema: record.schema, requestId: record.requestId, binding: parseEvidenceRequestBindingV1(record.binding), requestIssuedAt, requestExpiresAt, evaluatedAt, evidenceFreshUntil, disclosures: Object.freeze(disclosures) });
+  return Object.freeze({ ...base, outcome: head.outcome, evidenceFreshUntil: head.evidenceFreshUntil, disclosures: Object.freeze(disclosures) });
 }
