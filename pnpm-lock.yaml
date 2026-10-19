@@ -24,6 +24,12 @@ importers:
         specifier: 1.62.1
         version: 1.62.1
 
+  packages/admission-guard:
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/group-admission:
     dependencies:
       '@group-foundation/group-core':
