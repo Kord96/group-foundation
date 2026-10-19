@@ -48,6 +48,8 @@ imports a consumer package. HyperKey is not a Zagel runtime dependency.
   `hyperkey.*`; preview data is reset and predecessor values are rejected.
 - Consumers pin one immutable, version-aligned Foundation release closure. The
   initial closure was `0.1.0`; the admission-bootstrap v2 clean break is `0.2.0`.
+  The standalone admission guard joins the closure at `0.3.0`; the immutable
+  `0.2.0` closure remains unchanged.
 - The current MLS/OpenMLS/toolchain versions are preserved until a separately
   reviewed compatibility migration.
 - The current Zagel BFU remains in Zagel.

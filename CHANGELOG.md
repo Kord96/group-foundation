@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Add the standalone `@group-foundation/admission-guard` package for canonical
+  claim policies, request-bound signed evidence, and exact disclosure checks.
+  It has no runtime dependencies and is independent of group admission.
+- Qualify all four npm packages and the Rust crate as one version-aligned
+  `0.3.0` release closure. This preserves the immutable `0.2.0` closure, which
+  did not include admission guard.
+
 ## 0.2.0
 
 - Add the clean-break `group-foundation.admission.bootstrap.presentation.v2`

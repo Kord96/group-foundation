@@ -5,7 +5,7 @@ SDK, account, database server, transport or application shell. Its explicit
 qualification founder authority grants finite native facts after matching its
 local fixture evidence. It is not a production identity service.
 
-Install the exact `0.2.0` packages and Playwright, then run:
+Install the exact `0.3.0` packages and Playwright, then run:
 
 ```sh
 npm install

@@ -1,7 +1,7 @@
 # Extraction integration and consumer cutover
 
 Foundation depends downward only on its two sibling packages, pinned at exact
-`0.2.0` versions. Its runtime imports use frozen public exports; no compatibility
+`0.3.0` versions. Its runtime imports use frozen public exports; no compatibility
 declarations or source links are part of the package.
 
 ## Integration assumptions

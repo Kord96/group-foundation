@@ -6,6 +6,10 @@ independent of `@group-foundation/group-admission`. It creates canonical,
 short-lived requests and evaluates the exact requested claim disclosure through
 host cryptographic verification ports.
 
+The first release is `0.3.0`. Pin `@group-foundation/admission-guard@0.3.0`
+exactly; the immutable three-package `0.2.0` Foundation closure does not include
+this package.
+
 Exports: the root combines `/contracts`, `/wire`, `/policy`, and `/guard`.
 All policy and guard operations that hash data are asynchronous. Supply SHA-256
 as a port; production code uses `Uint8Array`, `TextEncoder`, and plain JavaScript.

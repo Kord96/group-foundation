@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "group-foundation-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.2.17",

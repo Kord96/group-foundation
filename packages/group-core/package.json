@@ -1,6 +1,6 @@
 {
   "name": "@group-foundation/group-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Portable MLS custody and staged group mechanics",
   "type": "module",
   "sideEffects": false,
