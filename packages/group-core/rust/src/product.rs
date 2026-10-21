@@ -127,6 +127,10 @@ impl ProductJoinLimits {
     }
     fn config(&self) -> MlsGroupJoinConfig {
         MlsGroupJoinConfig::builder()
+            // Every member can become the next committer. Preserve the same
+            // self-contained Welcome contract used by product group creators;
+            // a joined service must not emit an unjoinable third-member Welcome.
+            .use_ratchet_tree_extension(true)
             .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
             .sender_ratchet_configuration(SenderRatchetConfiguration::new(
                 self.out_of_order_tolerance,
@@ -856,6 +860,68 @@ mod tests {
             assert!(selected.stage_delete_product_group(invalid).is_err());
         }
         assert_eq!(provider.export_state().unwrap(), before);
+    }
+
+    #[test]
+    fn joined_product_member_retains_tree_bearing_welcomes_after_reopen() {
+        let creator = Provider::new();
+        let creator_signer = SigningIdentity::generate(&creator).unwrap();
+        let service = Provider::new();
+        let service_signer = SigningIdentity::generate(&service).unwrap();
+        let candidate = Provider::new();
+        let candidate_signer = SigningIdentity::generate(&candidate).unwrap();
+        let limits = || ProductJoinLimits::new(4, 4, 32).unwrap();
+        let capabilities = || Capabilities::new(
+            None, Some(&[GROUP_CIPHERSUITE]),
+            Some(&[ExtensionType::AppDataDictionary]),
+            Some(&[ProposalType::AppDataUpdate, ProposalType::SelfRemove]),
+            Some(&[CredentialType::Basic]),
+        );
+        let profile = ProductProfileHooks::new(
+            capabilities(), Extensions::single(Extension::AppDataDictionary(
+                AppDataDictionaryExtension::new(AppDataDictionary::new()),
+            )).unwrap(), Extensions::default(), limits(),
+        ).unwrap();
+        let mut group = creator.create_product_group(
+            &creator_signer, b"joined-member-welcome", credential(&creator_signer), &profile,
+        ).unwrap();
+        let service_package = service.product_key_package(
+            &service_signer, credential(&service_signer), capabilities(), Extensions::default(),
+        ).unwrap();
+        let initial = creator.prepare_product_commit(
+            &mut group, &creator_signer,
+            ProductCommitRequest { additions: vec![service_package], ..Default::default() },
+        ).unwrap();
+        let initial_welcome = MlsMessageIn::tls_deserialize_exact(&initial.welcome.unwrap()).unwrap();
+        let MlsMessageBodyIn::Welcome(initial_welcome) = initial_welcome.extract() else {
+            panic!("initial Welcome absent")
+        };
+        let staged = service.stage_product_welcome(&limits(), initial_welcome).unwrap();
+        service.install_product_welcome(staged).unwrap();
+        creator.merge_product_pending(&mut group).unwrap();
+        // The committing member is a real joined member reopened from its own
+        // private state, never a relabeled creator or a supplied public tree.
+        let service = Provider::from_state(&service.export_state().unwrap()).unwrap();
+        let mut service_group = service.load_product_group(b"joined-member-welcome").unwrap().unwrap();
+        let candidate_package = candidate.product_key_package(
+            &candidate_signer, credential(&candidate_signer), capabilities(), Extensions::default(),
+        ).unwrap();
+        let addition = service.prepare_product_commit(
+            &mut service_group, &service_signer,
+            ProductCommitRequest { additions: vec![candidate_package], ..Default::default() },
+        ).unwrap();
+        let welcome = MlsMessageIn::tls_deserialize_exact(&addition.welcome.unwrap()).unwrap();
+        let MlsMessageBodyIn::Welcome(welcome) = welcome.extract() else {
+            panic!("joined member Welcome absent")
+        };
+        // stage_product_welcome supplies no detached ratchet tree. OpenMLS must
+        // authenticate the tree actually carried by this genuine Welcome.
+        let staged = candidate.stage_product_welcome(&limits(), welcome).unwrap();
+        let candidate_group = candidate.install_product_welcome(staged).unwrap();
+        service.merge_product_pending(&mut service_group).unwrap();
+        assert_eq!(candidate_group.epoch(), service_group.epoch());
+        assert_eq!(candidate_group.inner.members().count(), 3);
+        assert_eq!(candidate_group.inner.export_ratchet_tree(), service_group.inner.export_ratchet_tree());
     }
 
     #[test]
