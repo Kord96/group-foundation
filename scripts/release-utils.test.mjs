@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { compareGenerated, readArchive, validateImport, validateManifest, validatePacked, validateReleaseVersions } from './release-utils.mjs';
+import { compareGenerated, readArchive, validateImport, validateManifest, validatePacked, validateReleaseVersions, validatePackageInventory, packageNames } from './release-utils.mjs';
 
 function archive(name = 'package/package.json', type = '0', body = '{}') {
   const header = Buffer.alloc(512), content = Buffer.from(body);
@@ -20,10 +20,10 @@ test('release closure requires one exact npm and Rust crate version', () => {
   const manifests = {
     'group-core': core,
     'group-admission': { version: '0.1.0' },
-    'bouncer': { version: '0.1.0' },
     hyperkey: { version: '0.1.0' },
   };
   assert.equal(validateReleaseVersions(manifests, '[package]\nversion = "0.1.0"\n'), '0.1.0');
+  assert.throws(() => validateReleaseVersions({ ...manifests, bouncer: { version: '0.1.0' } }, '[package]\nversion = "0.1.0"\n'), /standalone Bouncer must remain external/u);
   assert.throws(() => validateReleaseVersions({ ...manifests, hyperkey: { version: '0.2.0' } }, '[package]\nversion = "0.1.0"\n'), /versions must match/u);
   assert.throws(() => validateReleaseVersions(manifests, '[package]\nversion = "0.2.0"\n'), /Rust crate/u);
   assert.throws(() => validateReleaseVersions({ ...manifests, hyperkey: { version: 'latest' } }, '[package]\nversion = "0.1.0"\n'), /exact semver/u);
@@ -83,4 +83,19 @@ test('generated comparison rejects byte drift and changed inventory without over
     await writeFile(resolve(actual, 'extra.js'), '');
     await assert.rejects(compareGenerated(expected, actual), /inventory/u);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('Foundation release closure excludes the retired Bouncer owner', () => {
+  assert.deepEqual(packageNames, ['group-core', 'group-admission', 'hyperkey']);
+  validatePackageInventory(['hyperkey', 'group-core', 'group-admission']);
+  assert.throws(() => validatePackageInventory([...packageNames, 'bouncer']), /standalone Bouncer must remain external/u);
+  assert.throws(() => validatePackageInventory(['group-core', 'hyperkey']), /Foundation release owns only/u);
+  assert.throws(() => validateManifest({ name: '@group-foundation/bouncer' }, 'bouncer'), /not owned by Foundation/u);
+  assert.throws(() => validateManifest({ ...core, dependencies: { '@kord96/bouncer': '0.1.0' } }, 'group-core'));
+  const source = resolve(tmpdir(), 'admission/src/index.ts');
+  const admission = { name: '@group-foundation/group-admission', dependencies: { '@group-foundation/group-core': 'workspace:*' } };
+  for (const specifier of ['@group-foundation/bouncer', '@kord96/bouncer', '@kord96/bouncer/policy']) {
+    assert.throws(() => validateImport(specifier, source, resolve(tmpdir(), 'admission'), admission, true), /Undeclared/u);
+  }
 });

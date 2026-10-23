@@ -4,15 +4,20 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { posix, resolve, relative, sep } from 'node:path';
 
-export const packageNames = ['group-core', 'group-admission', 'bouncer', 'hyperkey'];
+export const packageNames = ['group-core', 'group-admission', 'hyperkey'];
 export const scope = '@group-foundation/';
 const expectedDependencies = {
-  'group-core': [], 'group-admission': ['group-core'], 'bouncer': [], hyperkey: ['group-admission', 'group-core'],
+  'group-core': [], 'group-admission': ['group-core'], hyperkey: ['group-admission', 'group-core'],
 };
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = async path => JSON.parse(await readFile(path, 'utf8'));
 
+export function validatePackageInventory(names) {
+  assert.deepEqual([...names].sort(), [...packageNames].sort(), 'Foundation release owns only core, admission and HyperKey; standalone Bouncer must remain external');
+}
+
 export function validateReleaseVersions(manifests, cargoManifest) {
+  validatePackageInventory(Object.keys(manifests));
   const versions = packageNames.map(name => manifests[name]?.version);
   for (const version of versions) assert.match(version ?? '', /^\d+\.\d+\.\d+$/u, 'npm package release version must be exact semver');
   assert.equal(new Set(versions).size, 1, 'Foundation npm package versions must match');
@@ -22,6 +27,7 @@ export function validateReleaseVersions(manifests, cargoManifest) {
 }
 
 export function validateManifest(manifest, name, packed = false) {
+  assert(packageNames.includes(name), `Package is not owned by Foundation: ${name}`);
   assert.equal(manifest.name, scope + name);
   assert.equal(manifest.private, undefined, `${name} must be publishable`);
   assert.deepEqual(Object.keys(manifest.dependencies ?? {}).sort(), expectedDependencies[name].map(dep => scope + dep));

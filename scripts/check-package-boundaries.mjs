@@ -3,10 +3,10 @@ import { createRequire } from 'node:module';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { filesBelow, json, packageNames, validateImport, validateManifest } from './release-utils.mjs';
+import { filesBelow, json, packageNames, validateImport, validateManifest, validatePackageInventory } from './release-utils.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-assert.deepEqual((await readdir(resolve(root, 'packages'))).sort(), [...packageNames].sort(), 'Update the release package inventory when adding packages');
+validatePackageInventory(await readdir(resolve(root, 'packages')));
 const ts = createRequire(resolve(root, 'packages/group-core/package.json'))('typescript');
 for (const name of packageNames) {
   const directory = resolve(root, 'packages', name), manifest = await json(resolve(directory, 'package.json'));
@@ -28,4 +28,4 @@ for (const name of packageNames) {
     visit(source);
   }
 }
-console.log('Package DAG and production imports passed: Bouncer is standalone; core → admission → HyperKey; testing remains separate.');
+console.log('Package DAG and production imports passed: standalone Bouncer remains external; core → admission → HyperKey; testing remains separate.');

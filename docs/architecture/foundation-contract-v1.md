@@ -16,12 +16,18 @@ a transport, database, identity service, profile, or UI.
   installation receipts, plus signed bootstrap presentation and local handoff
   state. Candidate verification and authorization are injected through ports;
   QR rendering, cameras, transports, and product policy remain consumers.
-- `@group-foundation/bouncer` owns portable claim policy, evidence requests,
-  verifier orchestration, and immutable approved or denied decisions. Callers
-  retain replay, currentness, persistence, membership and registry actions.
 - `@group-foundation/hyperkey` owns a logical conventional Ed25519 key, its
   immutable descriptor, independently admitted Copies, private seed delivery,
   and Copy workflow. It depends only on the two Foundation packages.
+
+Generic claim policy, evidence requests and verifier orchestration belong to
+standalone `@kord96/bouncer@0.1.0`, outside this repository and release closure.
+Bouncer checks requirements satisfaction, never membership or session permission.
+Registrar enforces configured requirements through Bouncer; IdV supplies evidence,
+Authorizer checks operations, and the consumer owner commits effects. Foundation
+admission uses its existing injected verification/authorization ports and has no
+Bouncer dependency. Bootstrap presentation, QR carrier ownership, and local
+handoff behavior are unchanged.
 
 ## Ownership exclusions
 
@@ -38,7 +44,6 @@ opens a persistence writer of its own.
 ```text
 group-core <- group-admission
 group-core <- hyperkey -> group-admission
-bouncer
 ```
 
 Zagel and future consumers depend downward on these packages. Foundation never
@@ -52,8 +57,13 @@ imports a consumer package. HyperKey is not a Zagel runtime dependency.
   `hyperkey.*`; preview data is reset and predecessor values are rejected.
 - Consumers pin one immutable, version-aligned Foundation release closure. The
   initial closure was `0.1.0`; the admission-bootstrap v2 clean break is `0.2.0`.
-  Bouncer replaces the standalone evaluator without aliases in `0.4.0`; older
-  immutable closures remain unchanged.
+  Historical `0.4.0` closures included `@group-foundation/bouncer`; their
+  receipts remain unchanged. The maintained Foundation closure now has three
+  npm packages; standalone Bouncer is independently pinned and qualified.
+- Standalone Bouncer uses `bouncer.*.v1` domains as an explicit clean break.
+  Retained old receipts must not be adopted or relabeled. Consumer/domain
+  migration belongs to Root and requires reviewed migration or explicit fresh
+  test state; there is no old-owner alias, fork, or fallback source import.
 - The current MLS/OpenMLS/toolchain versions are preserved until a separately
   reviewed compatibility migration.
 - The current Zagel BFU remains in Zagel.

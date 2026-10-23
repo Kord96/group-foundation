@@ -3,8 +3,8 @@
 Run `pnpm qualify:release` from the repository root before releasing Foundation.
 Every phase is required; a missing tool, browser, artifact, or failed assertion
 exits nonzero. This command does not publish packages or change versions.
-The gate also requires all four npm package versions and the Rust crate version
-to match so the qualified archives form one immutable release closure.
+The gate also requires all three Foundation npm package versions and the Rust
+crate version to match so the qualified archives form one immutable release closure.
 
 Prerequisites:
 
@@ -20,8 +20,9 @@ package DAG and production import checks, a clean TypeScript build followed by
 checks/tests, locked
 Rust tests with all features, core Chromium tests, and the HyperKey browser
 example. The dependency check requires core to have no production dependencies,
-admission to depend on core, Bouncer to have no production dependencies,
-and HyperKey to depend on core and admission. It
+admission to depend on core, and HyperKey to depend on core and admission.
+The package inventory rejects the retired Bouncer sibling; generic evidence
+policy belongs to standalone `@kord96/bouncer@0.1.0`, qualified separately. The gate
 parses TypeScript imports, including type imports and dynamic imports, to reject
 undeclared dependencies, relative package escapes, and production imports of
 testing modules.
@@ -36,7 +37,7 @@ Each public npm package is packed with pnpm so workspace dependencies become
 release versions. The gate checks the actual archive payload, dependency versions,
 exported JavaScript and declarations, and embedded WASM hashes. An external
 consumer installs only those tarballs with npm in offline mode and with lifecycle
-scripts disabled. Its dependency tree must contain exactly the four Foundation
+scripts disabled. Its dependency tree must contain exactly the three Foundation
 packages. It imports every JavaScript export, checks the public declarations with
 TypeScript (including the disposable types used by wasm-bindgen), runs the core
 native MLS lifecycle assertions against the installed
@@ -72,23 +73,28 @@ qualification report is required before publishing. Retain the qualified
 archives and their SHA-256 hashes, and publish those exact npm archives rather
 than rebuilding them. The version-aligned npm closure contains
 `@group-foundation/group-core`, `@group-foundation/group-admission`,
-`@group-foundation/bouncer`, and `@group-foundation/hyperkey`; the Rust
+and `@group-foundation/hyperkey`; the Rust
 crate is `group-foundation-core`.
 
 The publisher needs npm authentication with permission to publish the
 `@group-foundation` scope, and Cargo authentication/ownership for the Rust crate.
 The scoped npm packages require public access (`npm publish <qualified.tgz>
---access public`). Publish core before admission, and both before HyperKey;
-Bouncer has no dependency ordering requirement. Confirm the exact
-versions are available in the registry before handing consumers the release.
+--access public`). Publish core before admission, and both before HyperKey.
+Confirm the exact versions are available in the registry before handing consumers the release.
 
-Consumers of Bouncer must pin
-`@group-foundation/bouncer@0.4.0` exactly. A source checkout or local
-tarball does not establish that this registry release is available.
+Bouncer consumers separately pin `@kord96/bouncer@0.1.0` from its qualified
+immutable archive or independently verified registry publication. It is not a
+Foundation package or version-aligned release member. A source checkout or local
+archive does not establish registry publication. Its neutral `bouncer.*.v1`
+domains require an explicit clean break; old retained receipts must not be adopted.
+Root owns consumer/domain migration and separate licensing verification.
 
 An archive-based consumer may instead retain the exact qualified npm archives
 with their report hashes and the immutable Foundation Git revision. Its intake
 must install those archives as packages and verify the installed versions; it
 must not substitute a mutable checkout, rename the old `0.2.0` closure, or assume
-that an npm publication occurred. Bouncer belongs to the version-aligned
-four-package `0.4.0` closure.
+that an npm publication occurred. Historical four-package `0.4.0` closures,
+including their old-owner Bouncer archives and receipts, remain historical
+and unchanged; they do not authorize a current dependency or source fallback.
+Root updates the workspace lockfile after retiring the source package and before
+running the frozen-install qualification gate.
